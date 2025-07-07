@@ -137,6 +137,7 @@ async function generateTransectRoute(polygon: any, parameters: any) {
     // Generate transect lines based on bearing
     const lineCount = Math.ceil((maxX - minX) / (effectiveDistance / 111000)); // Rough conversion to degrees
     
+    // First pass: Generate all transect lines
     for (let i = 0; i < lineCount; i++) {
       const x = minX + (i * effectiveDistance / 111000);
       
@@ -152,32 +153,41 @@ async function generateTransectRoute(polygon: any, parameters: any) {
       // Clip line to polygon
       try {
         const clippedLine = turf.lineIntersect(rotatedLine, polygonFeature);
-        if (clippedLine.features.length > 0) {
-          // Convert intersection points to line
+        if (clippedLine.features.length >= 2) {
+          // Convert intersection points to line, sort by latitude for consistency
           const coords = clippedLine.features.map(f => f.geometry.coordinates);
-          if (coords.length >= 2) {
-            const transectLine = turf.lineString([coords[0], coords[coords.length - 1]]);
-            transectLines.push(transectLine);
-            
-            // Add waypoints (alternate direction for back-and-forth pattern)
-            const lineCoords = transectLine.geometry.coordinates;
-            if (i % 2 === 0) {
-              // Forward direction
-              waypoints.push(
-                { lat: lineCoords[0][1], lng: lineCoords[0][0] },
-                { lat: lineCoords[1][1], lng: lineCoords[1][0] }
-              );
-            } else {
-              // Reverse direction
-              waypoints.push(
-                { lat: lineCoords[1][1], lng: lineCoords[1][0] },
-                { lat: lineCoords[0][1], lng: lineCoords[0][0] }
-              );
-            }
-          }
+          const sortedCoords = coords.sort((a, b) => a[1] - b[1]); // Sort by latitude
+          const transectLine = turf.lineString([sortedCoords[0], sortedCoords[sortedCoords.length - 1]]);
+          transectLines.push(transectLine);
         }
       } catch (e) {
         console.warn("Failed to clip line to polygon:", e);
+      }
+    }
+
+    // Second pass: Create alternating waypoint path for efficient surveying
+    for (let i = 0; i < transectLines.length; i++) {
+      const line = transectLines[i];
+      const lineCoords = line.geometry.coordinates;
+      const start = { lat: lineCoords[0][1], lng: lineCoords[0][0] };
+      const end = { lat: lineCoords[1][1], lng: lineCoords[1][0] };
+      
+      if (i === 0) {
+        // First line: go from start to end
+        waypoints.push(start, end);
+      } else {
+        // For subsequent lines, connect to the closest end of the previous line
+        const lastWaypoint = waypoints[waypoints.length - 1];
+        const distanceToStart = turf.distance([lastWaypoint.lng, lastWaypoint.lat], [start.lng, start.lat]);
+        const distanceToEnd = turf.distance([lastWaypoint.lng, lastWaypoint.lat], [end.lng, end.lat]);
+        
+        if (distanceToStart < distanceToEnd) {
+          // Connect to start, then go to end
+          waypoints.push(start, end);
+        } else {
+          // Connect to end, then go to start (reverse direction)
+          waypoints.push(end, start);
+        }
       }
     }
     
