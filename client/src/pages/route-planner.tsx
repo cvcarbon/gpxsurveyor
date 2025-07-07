@@ -47,7 +47,7 @@ export default function RoutePlanner() {
   return (
     <>
       <Helmet>
-        <title>GIS Route Planner - Autopilot Route Generator</title>
+        <title>GPX Surveyor - Autopilot Route Generator</title>
         <meta name="description" content="Generate autopilot survey routes with transect lines and GPX export from uploaded or drawn polygons for Garmin chartplotters and drones." />
       </Helmet>
       

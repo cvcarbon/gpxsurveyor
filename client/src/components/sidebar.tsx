@@ -43,7 +43,7 @@ export default function Sidebar({
       <div className="p-6 border-b border-gray-200">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold text-gray-900">GIS Route Planner</h1>
+            <h1 className="text-xl font-bold text-gray-900">GPX Surveyor</h1>
             <p className="text-sm text-gray-500">Autopilot Route Generator</p>
           </div>
 
