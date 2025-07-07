@@ -202,12 +202,28 @@ async function generateTransectRoute(polygon: any, parameters: any) {
       }
       
       if (i === 0) {
-        // First line: add both endpoints
-        waypoints.push({ lat: travelStart[1], lng: travelStart[0] });
-        waypoints.push({ lat: travelEnd[1], lng: travelEnd[0] });
+        // First line: add waypoints along the entire line
+        const lineString = turf.lineString([travelStart, travelEnd]);
+        const lineLength = turf.length(lineString, { units: 'kilometers' });
+        const numWaypoints = Math.max(2, Math.ceil(lineLength * 10)); // About 10 waypoints per km
+        
+        for (let j = 0; j <= numWaypoints; j++) {
+          const progress = j / numWaypoints;
+          const point = turf.along(lineString, progress * lineLength, { units: 'kilometers' });
+          waypoints.push({ lat: point.geometry.coordinates[1], lng: point.geometry.coordinates[0] });
+        }
       } else {
-        // For subsequent lines, just add the end point (start is connected by curve)
-        waypoints.push({ lat: travelEnd[1], lng: travelEnd[0] });
+        // For subsequent lines, add waypoints along the line (start is connected by curve)
+        const lineString = turf.lineString([travelStart, travelEnd]);
+        const lineLength = turf.length(lineString, { units: 'kilometers' });
+        const numWaypoints = Math.max(2, Math.ceil(lineLength * 10)); // About 10 waypoints per km
+        
+        // Skip the first waypoint (it's connected by the curve) and add the rest
+        for (let j = 1; j <= numWaypoints; j++) {
+          const progress = j / numWaypoints;
+          const point = turf.along(lineString, progress * lineLength, { units: 'kilometers' });
+          waypoints.push({ lat: point.geometry.coordinates[1], lng: point.geometry.coordinates[0] });
+        }
       }
       
       // Add curved turn between this line and the next
