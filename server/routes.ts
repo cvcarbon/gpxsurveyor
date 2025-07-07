@@ -247,9 +247,20 @@ async function generateTransectRoute(polygon: any, parameters: any) {
         }
         
         // Following Python method: align points in survey direction
-        const T1 = travelEnd;
+        let T1 = travelEnd;
         const T1_proj = T1[0] * D[0] + T1[1] * D[1];
-        const T2 = alignPoint(nextTravelStart, T1_proj, D);
+        const nextProj = nextTravelStart[0] * D[0] + nextTravelStart[1] * D[1];
+        
+        // If next line is ahead in survey direction, extend current line
+        if (nextProj > T1_proj) {
+          const extensionDistance = (nextProj - T1_proj) + 50; // Add 50m buffer
+          T1 = turf.destination(T1, extensionDistance, parameters.bearing, {units: 'meters'}).geometry.coordinates;
+          
+          // Add waypoint for the extended endpoint
+          waypoints.push({ lat: T1[1], lng: T1[0] });
+        }
+        
+        const T2 = alignPoint(nextTravelStart, T1[0] * D[0] + T1[1] * D[1], D);
         
         // Calculate chord distance and radius
         const chordDx = T2[0] - T1[0];
