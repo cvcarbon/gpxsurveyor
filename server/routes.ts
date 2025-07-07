@@ -240,8 +240,11 @@ async function generateTransectRoute(polygon: any, parameters: any) {
           nextTravelStart = nextEnd;
         }
         
-        // Current turn direction
-        const turnRight = (i % 2 === 0);
+        // Current turn direction - flip for bearings between 90-270 degrees
+        let turnRight = (i % 2 === 0);
+        if (parameters.bearing > 90 && parameters.bearing < 270) {
+          turnRight = !turnRight; // Flip for southern hemisphere bearings
+        }
         
         // Following Python method: align points in survey direction
         const T1 = travelEnd;
