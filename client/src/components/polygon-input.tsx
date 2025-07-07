@@ -10,12 +10,16 @@ interface PolygonInputProps {
   polygon: any;
   onPolygonChange: (polygon: any) => void;
   onError: (error: string) => void;
+  onStartDrawing?: () => void;
+  onClearMap?: () => void;
 }
 
 export default function PolygonInput({
   polygon,
   onPolygonChange,
   onError,
+  onStartDrawing,
+  onClearMap,
 }: PolygonInputProps) {
   const [activeTab, setActiveTab] = useState<"upload" | "draw">("upload");
   const [uploadedFiles, setUploadedFiles] = useState<any[]>([]);
@@ -78,6 +82,12 @@ export default function PolygonInput({
   const clearPolygon = () => {
     onPolygonChange(null);
     setUploadedFiles([]);
+    // Call the map clear function if available
+    if (onClearMap) {
+      onClearMap();
+    } else if ((window as any).mapClearFunction) {
+      (window as any).mapClearFunction();
+    }
   };
 
   const createTestPolygon = () => {
@@ -185,11 +195,17 @@ export default function PolygonInput({
         {activeTab === "draw" && (
           <div className="space-y-4">
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <div className="flex items-center">
+              <div className="flex items-center mb-2">
                 <div className="w-4 h-4 bg-blue-500 rounded-full mr-2"></div>
-                <p className="text-sm text-blue-700">
-                  Click on the map to start drawing a polygon, or use the test polygon below
+                <p className="text-sm text-blue-700 font-medium">
+                  Drawing Instructions:
                 </p>
+              </div>
+              <div className="text-sm text-blue-600 space-y-1">
+                <p>1. Look for the drawing controls on the map (top-left corner)</p>
+                <p>2. Click the polygon tool (square icon)</p>
+                <p>3. Click points on the map to create your survey area</p>
+                <p>4. Double-click to finish the polygon</p>
               </div>
             </div>
 
@@ -209,9 +225,17 @@ export default function PolygonInput({
                 onClick={clearPolygon}
               >
                 <Trash2 className="h-4 w-4 mr-2" />
-                Clear
+                Clear All
               </Button>
             </div>
+
+            {polygon && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                <p className="text-sm text-green-700">
+                  ✓ Polygon ready! You can now generate a route.
+                </p>
+              </div>
+            )}
           </div>
         )}
       </CardContent>

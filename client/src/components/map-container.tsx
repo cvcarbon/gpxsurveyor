@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Expand, Trash2, Layers, ZoomIn, ZoomOut } from "lucide-react";
@@ -9,6 +9,8 @@ interface MapContainerProps {
   onPolygonChange: (polygon: any) => void;
   generatedRoute: any;
   sidebarOpen: boolean;
+  drawingMode?: boolean;
+  onDrawingModeChange?: (mode: boolean) => void;
 }
 
 export default function MapContainer({
@@ -16,11 +18,15 @@ export default function MapContainer({
   onPolygonChange,
   generatedRoute,
   sidebarOpen,
+  drawingMode = false,
+  onDrawingModeChange,
 }: MapContainerProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
   const polygonLayerRef = useRef<any>(null);
   const routeLayerRef = useRef<any>(null);
+  const drawControlRef = useRef<any>(null);
+  const drawnItemsRef = useRef<any>(null);
   const [mouseCoords, setMouseCoords] = useState({ lat: 40.7128, lng: -74.0060 });
   const [showLegend, setShowLegend] = useState(false);
 
@@ -65,6 +71,7 @@ export default function MapContainer({
         import("leaflet-draw").then(() => {
           const drawnItems = new L.FeatureGroup();
           map.addLayer(drawnItems);
+          drawnItemsRef.current = drawnItems;
 
           const drawControl = new (L as any).Control.Draw({
             edit: {
@@ -80,15 +87,18 @@ export default function MapContainer({
             },
           });
           map.addControl(drawControl);
+          drawControlRef.current = drawControl;
 
           // Handle drawing events
           map.on('draw:created', (e: any) => {
             const layer = e.layer;
+            drawnItems.clearLayers(); // Clear previous drawings
             drawnItems.addLayer(layer);
             
             // Convert to GeoJSON
             const geoJSON = layer.toGeoJSON();
             onPolygonChange(geoJSON);
+            onDrawingModeChange?.(false);
           });
 
           map.on('draw:edited', (e: any) => {
@@ -101,6 +111,14 @@ export default function MapContainer({
 
           map.on('draw:deleted', () => {
             onPolygonChange(null);
+          });
+
+          map.on('draw:drawstart', () => {
+            onDrawingModeChange?.(true);
+          });
+
+          map.on('draw:drawstop', () => {
+            onDrawingModeChange?.(false);
           });
         });
 
@@ -223,9 +241,17 @@ export default function MapContainer({
         routeLayerRef.current = null;
       }
       
+      // Clear drawn items
+      if (drawnItemsRef.current) {
+        drawnItemsRef.current.clearLayers();
+      }
+      
       onPolygonChange(null);
     }
   };
+
+  // Expose the clear map function globally so it can be called from the sidebar
+  window.mapClearFunction = handleClearMap;
 
   return (
     <div className="relative h-full">
