@@ -165,9 +165,72 @@ async function generateTransectRoute(polygon: any, parameters: any) {
       }
     }
 
-    // Second pass: Create alternating waypoint path for efficient surveying
-    // We need to modify the transect lines themselves to alternate direction
+    // Second pass: Create alternating waypoint path with curved U-turns
     const alternatingLines = [];
+    const turnRadiusMeters = parameters.turnRadius || (parameters.distance * 0.5); // Default to half the transect distance
+    const turnRadiusDegrees = turnRadiusMeters / 111000; // Convert to degrees
+    
+    // Helper function to create a curved U-turn
+    const createCurvedTurn = (fromPoint: number[], toPoint: number[], currentBearing: number) => {
+      const curvePoints: number[][] = [];
+      
+      // Calculate the lateral distance between the lines
+      const lateralDistance = turf.distance(fromPoint, toPoint) * 1000; // Convert to meters
+      
+      // For a U-turn, we need to create a semicircle
+      // The radius should be half the lateral distance but constrained by turnRadius
+      const idealRadius = lateralDistance / 2;
+      const actualRadius = Math.min(idealRadius, turnRadiusMeters);
+      
+      // Determine if we're turning left or right based on the relative position
+      const bearingToNext = turf.bearing(fromPoint, toPoint);
+      let turnDirection = 1; // 1 for right, -1 for left
+      
+      // Normalize bearing difference
+      let bearingDiff = bearingToNext - currentBearing;
+      if (bearingDiff > 180) bearingDiff -= 360;
+      if (bearingDiff < -180) bearingDiff += 360;
+      
+      // If the next line is to our left (bearing difference negative), turn left
+      if (bearingDiff < 0) turnDirection = -1;
+      
+      // Create the U-turn arc
+      const numPoints = 15; // More points for smoother curve
+      const totalAngle = 180; // U-turn is 180 degrees
+      
+      for (let i = 0; i <= numPoints; i++) {
+        const angle = (i / numPoints) * totalAngle;
+        const currentHeading = currentBearing + (turnDirection * angle);
+        
+        // Calculate position along the arc
+        if (i === 0) {
+          curvePoints.push(fromPoint);
+        } else if (i === numPoints) {
+          // Ensure we end exactly at the target point
+          curvePoints.push(toPoint);
+        } else {
+          // Intermediate points on the arc
+          const progress = i / numPoints;
+          const arcAngle = progress * Math.PI; // Convert to radians
+          
+          // Calculate point on semicircle
+          const centerX = (fromPoint[0] + toPoint[0]) / 2;
+          const centerY = (fromPoint[1] + toPoint[1]) / 2;
+          
+          // Vector from center to fromPoint
+          const dx = fromPoint[0] - centerX;
+          const dy = fromPoint[1] - centerY;
+          
+          // Rotate this vector by arcAngle
+          const rotatedX = dx * Math.cos(arcAngle * turnDirection) - dy * Math.sin(arcAngle * turnDirection);
+          const rotatedY = dx * Math.sin(arcAngle * turnDirection) + dy * Math.cos(arcAngle * turnDirection);
+          
+          curvePoints.push([centerX + rotatedX, centerY + rotatedY]);
+        }
+      }
+      
+      return curvePoints;
+    };
     
     for (let i = 0; i < transectLines.length; i++) {
       const line = transectLines[i];
@@ -188,14 +251,35 @@ async function generateTransectRoute(polygon: any, parameters: any) {
         const distanceToStart = turf.distance([lastWaypoint.lng, lastWaypoint.lat], start);
         const distanceToEnd = turf.distance([lastWaypoint.lng, lastWaypoint.lat], end);
         
+        // Get the bearing of the previous line to calculate curve
+        const prevLine = alternatingLines[i - 1];
+        const prevCoords = prevLine.geometry.coordinates;
+        const prevBearing = turf.bearing(prevCoords[prevCoords.length - 2], prevCoords[prevCoords.length - 1]);
+        
         if (distanceToStart < distanceToEnd) {
-          // Connect to start, line goes from start to end
+          // Create curve from last point to start of this line
+          const curvePoints = createCurvedTurn([lastWaypoint.lng, lastWaypoint.lat], start, prevBearing);
+          
+          // Add curve points as waypoints
+          curvePoints.forEach(point => {
+            waypoints.push({ lat: point[1], lng: point[0] });
+          });
+          
+          // Add the transect line (start to end)
           alternatingLines.push(turf.lineString([start, end]));
-          waypoints.push({ lat: start[1], lng: start[0] }, { lat: end[1], lng: end[0] });
+          waypoints.push({ lat: end[1], lng: end[0] });
         } else {
-          // Connect to end, reverse the line direction (end to start)
+          // Create curve from last point to end of this line
+          const curvePoints = createCurvedTurn([lastWaypoint.lng, lastWaypoint.lat], end, prevBearing);
+          
+          // Add curve points as waypoints
+          curvePoints.forEach(point => {
+            waypoints.push({ lat: point[1], lng: point[0] });
+          });
+          
+          // Add the transect line (end to start - reversed)
           alternatingLines.push(turf.lineString([end, start]));
-          waypoints.push({ lat: end[1], lng: end[0] }, { lat: start[1], lng: start[0] });
+          waypoints.push({ lat: start[1], lng: start[0] });
         }
       }
     }

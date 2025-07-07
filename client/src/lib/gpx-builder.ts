@@ -1,27 +1,25 @@
 export const generateGPX = (route: any): string => {
   const { waypoints = [], transectLines = [], name = "Transect Route" } = route;
   
-  // Create track segments from transect lines - simplified format like user's example
-  const trackSegments = transectLines.map((line: any, index: number) => {
-    const coordinates = line.geometry.coordinates;
-    const trackPoints = coordinates.map((coord: number[]) => {
-      return `      <trkpt lon="${coord[0]}" lat="${coord[1]}">
+  // Create a single track segment with all waypoints (includes curves and lines)
+  // This creates a continuous path for the autopilot to follow
+  const trackPoints = waypoints.map((waypoint: any) => {
+    return `      <trkpt lon="${waypoint.lng}" lat="${waypoint.lat}">
         <ele>0</ele>
       </trkpt>`;
-    }).join('\n');
-    
-    return `    <trkseg>
+  }).join('\n');
+  
+  const trackSegment = `    <trkseg>
 ${trackPoints}
     </trkseg>`;
-  }).join('\n');
 
-  // Create a single track with all transect segments
+  // Create a single track with the continuous path
   return `<?xml version="1.0" ?>
 <gpx xmlns="http://www.topografix.com/GPX/1/1" xalan="http://xml.apache.org/xalan" xsi="http://www.w3.org/2001/XMLSchema-instance" creator="GIS Route Planner" version="1.1">
   <trk>
     <name>${name}</name>
     <desc>1</desc>
-${trackSegments}
+${trackSegment}
   </trk>
 </gpx>`;
 };
