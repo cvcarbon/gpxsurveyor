@@ -11,6 +11,7 @@ interface MapContainerProps {
   sidebarOpen: boolean;
   drawingMode?: boolean;
   onDrawingModeChange?: (mode: boolean) => void;
+  onToggleSidebar?: () => void;
 }
 
 export default function MapContainer({
@@ -20,6 +21,7 @@ export default function MapContainer({
   sidebarOpen,
   drawingMode = false,
   onDrawingModeChange,
+  onToggleSidebar,
 }: MapContainerProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
@@ -261,6 +263,20 @@ export default function MapContainer({
         className="h-full w-full"
         style={{ minHeight: "100vh" }}
       />
+
+      {/* Sidebar Toggle Button (shown when sidebar is closed) */}
+      {!sidebarOpen && onToggleSidebar && (
+        <div className="absolute top-4 left-4">
+          <Button
+            onClick={onToggleSidebar}
+            variant="default"
+            size="icon"
+            className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg"
+          >
+            <Menu className="h-5 w-5" />
+          </Button>
+        </div>
+      )}
 
       {/* Map Controls */}
       <div className="absolute top-4 right-4 space-y-2">

@@ -71,6 +71,7 @@ export default function RoutePlanner() {
             onPolygonChange={handlePolygonChange}
             generatedRoute={generatedRoute}
             sidebarOpen={sidebarOpen}
+            onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
           />
         </div>
       </div>
