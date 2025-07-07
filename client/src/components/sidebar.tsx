@@ -46,14 +46,7 @@ export default function Sidebar({
             <h1 className="text-xl font-bold text-gray-900">GIS Route Planner</h1>
             <p className="text-sm text-gray-500">Autopilot Route Generator</p>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onToggle}
-            className="h-10 w-10"
-          >
-            {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-          </Button>
+
         </div>
       </div>
 
