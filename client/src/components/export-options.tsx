@@ -25,9 +25,15 @@ export default function ExportOptions({
       const blob = new Blob([gpxContent], { type: "application/gpx+xml" });
       const url = URL.createObjectURL(blob);
       
+      // Generate filename using route name, bearing, and distance
+      const routeName = generatedRoute.name || "Survey Route";
+      const bearing = generatedRoute.bearing || 0;
+      const distance = generatedRoute.distance || 50;
+      const filename = `${routeName}_${bearing}d_${distance}m.gpx`;
+      
       const a = document.createElement("a");
       a.href = url;
-      a.download = `transect-route-${Date.now()}.gpx`;
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -49,9 +55,15 @@ export default function ExportOptions({
       const blob = new Blob([kmlContent], { type: "application/vnd.google-earth.kml+xml" });
       const url = URL.createObjectURL(blob);
       
+      // Generate filename using route name, bearing, and distance
+      const routeName = generatedRoute.name || "Survey Route";
+      const bearing = generatedRoute.bearing || 0;
+      const distance = generatedRoute.distance || 50;
+      const filename = `${routeName}_${bearing}d_${distance}m.kml`;
+      
       const a = document.createElement("a");
       a.href = url;
-      a.download = `transect-route-${Date.now()}.kml`;
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);

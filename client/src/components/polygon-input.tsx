@@ -90,24 +90,7 @@ export default function PolygonInput({
     }
   };
 
-  const createTestPolygon = () => {
-    // Create a simple rectangular test polygon (centered around NYC)
-    const testPolygon = {
-      type: "Feature",
-      geometry: {
-        type: "Polygon",
-        coordinates: [[
-          [-74.02, 40.71], // Southwest corner
-          [-74.00, 40.71], // Southeast corner  
-          [-74.00, 40.73], // Northeast corner
-          [-74.02, 40.73], // Northwest corner
-          [-74.02, 40.71]  // Close the polygon
-        ]]
-      },
-      properties: {}
-    };
-    onPolygonChange(testPolygon);
-  };
+
 
   return (
     <Card className="border-0 border-b border-gray-100 rounded-none">
@@ -210,15 +193,6 @@ export default function PolygonInput({
             </div>
 
             <div className="flex space-x-2">
-              <Button 
-                className="flex-1" 
-                size="sm"
-                onClick={createTestPolygon}
-                variant="outline"
-              >
-                <Pencil className="h-4 w-4 mr-2" />
-                Test Polygon
-              </Button>
               <Button
                 variant="outline"
                 size="sm"

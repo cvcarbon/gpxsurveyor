@@ -27,7 +27,7 @@ export default function MapContainer({
   const routeLayerRef = useRef<any>(null);
   const drawControlRef = useRef<any>(null);
   const drawnItemsRef = useRef<any>(null);
-  const [mouseCoords, setMouseCoords] = useState({ lat: 40.7128, lng: -74.0060 });
+  const [mouseCoords, setMouseCoords] = useState({ lat: 29.3013, lng: -94.7977 });
   const [showLegend, setShowLegend] = useState(false);
 
   useEffect(() => {
@@ -42,8 +42,8 @@ export default function MapContainer({
           shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
         });
 
-        // Initialize map
-        const map = L.map(mapRef.current!).setView([40.7128, -74.0060], 10);
+        // Initialize map centered on Galveston Bay, TX
+        const map = L.map(mapRef.current!).setView([29.3013, -94.7977], 12);
         
         // Add tile layer with better configuration
         const tileLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {

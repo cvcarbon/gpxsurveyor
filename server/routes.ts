@@ -327,6 +327,8 @@ async function generateTransectRoute(polygon: any, parameters: any) {
       waypoints,
       totalDistance: Math.round(totalDistance),
       estimatedTime,
+      bearing: parameters.bearing,
+      distance: parameters.distance,
     };
     
   } catch (error) {

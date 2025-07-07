@@ -121,6 +121,9 @@ NODE_ENV=production|development
 ## Changelog
 - July 07, 2025. Initial setup
 - July 07, 2025. Enhanced route generation with speed control slider featuring multiple units (kph, mph, knots) and dynamic time estimation
+- July 07, 2025. Completed curved U-turn implementation following Python reference algorithm with proper point alignment and bearing-specific turn direction handling
+- July 07, 2025. Added waypoints along transect lines for smooth autopilot tracking and line extension logic to prevent reverse movement
+- July 07, 2025. Updated housekeeping: removed test polygon button, changed default map view to Galveston Bay TX, implemented custom filename format {route name}_{bearing}d_{distance}m
 
 ## User Preferences
 
