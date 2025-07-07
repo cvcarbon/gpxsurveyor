@@ -166,106 +166,103 @@ async function generateTransectRoute(polygon: any, parameters: any) {
     }
 
     // Second pass: Create alternating waypoint path with curved U-turns
+    // Following the Python reference method for smooth curve generation
     const turnRadiusMeters = parameters.turnRadius || (parameters.distance * 0.5);
     
+    // Use existing bearingRad from above for direction vector calculations
+    const D = [Math.sin(bearingRad), Math.cos(bearingRad)]; // Direction vector
+    
+    // Helper function to align points in survey direction (like Python adjust_point)
+    const alignPoint = (point: number[], target: number, directionVector: number[]) => {
+      const current = point[0] * directionVector[0] + point[1] * directionVector[1];
+      const shift = target - current;
+      return [
+        point[0] + shift * directionVector[0],
+        point[1] + shift * directionVector[1]
+      ];
+    };
+    
+    // Build route with alternating pattern and curved turns
     for (let i = 0; i < transectLines.length; i++) {
       const line = transectLines[i];
       const lineCoords = line.geometry.coordinates;
       const start = lineCoords[0];
       const end = lineCoords[1];
       
-      if (i === 0) {
-        // First line: add waypoints from start to end
-        waypoints.push({ lat: start[1], lng: start[0] });
-        waypoints.push({ lat: end[1], lng: end[0] });
+      let travelStart: number[], travelEnd: number[];
+      
+      if (i % 2 === 0) {
+        // Even lines: go from start to end
+        travelStart = start;
+        travelEnd = end;
       } else {
-        // Get previous line info
-        const prevLine = transectLines[i - 1];
-        const prevStart = prevLine.geometry.coordinates[0];
-        const prevEnd = prevLine.geometry.coordinates[1];
+        // Odd lines: go from end to start (alternating pattern)
+        travelStart = end;
+        travelEnd = start;
+      }
+      
+      if (i === 0) {
+        // First line: add both endpoints
+        waypoints.push({ lat: travelStart[1], lng: travelStart[0] });
+        waypoints.push({ lat: travelEnd[1], lng: travelEnd[0] });
+      } else {
+        // For subsequent lines, just add the end point (start is connected by curve)
+        waypoints.push({ lat: travelEnd[1], lng: travelEnd[0] });
+      }
+      
+      // Add curved turn between this line and the next
+      if (i < transectLines.length - 1) {
+        const nextLine = transectLines[i + 1];
+        const nextStart = nextLine.geometry.coordinates[0];
+        const nextEnd = nextLine.geometry.coordinates[1];
         
-        // Determine where we ended on the previous line
-        const lastWaypoint = waypoints[waypoints.length - 1];
-        const endedAtPrevStart = (Math.abs(lastWaypoint.lat - prevStart[1]) < 0.00001 && 
-                                  Math.abs(lastWaypoint.lng - prevStart[0]) < 0.00001);
-        const fromPoint = endedAtPrevStart ? prevStart : prevEnd;
-        
-        // Check which end of current line is closer
-        const distanceToStart = turf.distance(fromPoint, start);
-        const distanceToEnd = turf.distance(fromPoint, end);
-        const goingToStart = distanceToStart < distanceToEnd;
-        const toPoint = goingToStart ? start : end;
-        
-        // Calculate bearings for the curve
-        const exitBearing = endedAtPrevStart 
-          ? turf.bearing(prevEnd, prevStart) // Reverse bearing if we ended at start
-          : turf.bearing(prevStart, prevEnd); // Normal bearing if we ended at end
-          
-        const entryBearing = goingToStart
-          ? turf.bearing(start, end) // Normal bearing if entering at start
-          : turf.bearing(end, start); // Reverse bearing if entering at end
-        
-        // Create a simple curved U-turn
-        const lateralDistance = turf.distance(fromPoint, toPoint) * 1000; // meters
-        const effectiveRadius = Math.min(turnRadiusMeters, lateralDistance * 0.4);
-        
-        // Extend beyond the line endpoints
-        const extensionDistance = effectiveRadius;
-        const extendedFrom = turf.destination(fromPoint, extensionDistance, exitBearing, {units: 'meters'});
-        const extendedTo = turf.destination(toPoint, extensionDistance, entryBearing + 180, {units: 'meters'});
-        
-        // Generate curve points
-        const numCurvePoints = 15;
-        
-        // Add extension from line end
-        for (let j = 1; j <= 3; j++) {
-          const progress = j / 3;
-          const pt = turf.along(
-            turf.lineString([fromPoint, extendedFrom.geometry.coordinates]),
-            progress * extensionDistance,
-            {units: 'meters'}
-          );
-          waypoints.push({ lat: pt.geometry.coordinates[1], lng: pt.geometry.coordinates[0] });
-        }
-        
-        // Create arc between extended points
-        for (let j = 1; j < numCurvePoints; j++) {
-          const progress = j / numCurvePoints;
-          
-          // Simple interpolation for the arc
-          const arcLng = extendedFrom.geometry.coordinates[0] + 
-                        (extendedTo.geometry.coordinates[0] - extendedFrom.geometry.coordinates[0]) * progress;
-          const arcLat = extendedFrom.geometry.coordinates[1] + 
-                        (extendedTo.geometry.coordinates[1] - extendedFrom.geometry.coordinates[1]) * progress;
-          
-          // Add outward bulge to create arc
-          const midProgress = 1 - Math.abs(2 * progress - 1); // Peak at 0.5
-          const bulgeDistance = effectiveRadius * midProgress * 0.5;
-          const perpBearing = ((exitBearing + entryBearing) / 2 + 90) % 360;
-          
-          const bulgePoint = turf.destination([arcLng, arcLat], bulgeDistance, perpBearing, {units: 'meters'});
-          waypoints.push({ lat: bulgePoint.geometry.coordinates[1], lng: bulgePoint.geometry.coordinates[0] });
-        }
-        
-        // Add approach to the next line
-        for (let j = 3; j >= 1; j--) {
-          const progress = j / 3;
-          const pt = turf.along(
-            turf.lineString([toPoint, extendedTo.geometry.coordinates]),
-            progress * extensionDistance,
-            {units: 'meters'}
-          );
-          waypoints.push({ lat: pt.geometry.coordinates[1], lng: pt.geometry.coordinates[0] });
-        }
-        
-        // Add the transect line endpoints
-        if (goingToStart) {
-          waypoints.push({ lat: start[1], lng: start[0] });
-          waypoints.push({ lat: end[1], lng: end[0] });
+        // Determine next line's travel direction
+        let nextTravelStart: number[];
+        if ((i + 1) % 2 === 0) {
+          nextTravelStart = nextStart;
         } else {
-          waypoints.push({ lat: end[1], lng: end[0] });
-          waypoints.push({ lat: start[1], lng: start[0] });
+          nextTravelStart = nextEnd;
         }
+        
+        // Current turn direction
+        const turnRight = (i % 2 === 0);
+        
+        // Following Python method: align points in survey direction
+        const T1 = travelEnd;
+        const T1_proj = T1[0] * D[0] + T1[1] * D[1];
+        const T2 = alignPoint(nextTravelStart, T1_proj, D);
+        
+        // Calculate chord distance and radius
+        const chordDx = T2[0] - T1[0];
+        const chordDy = T2[1] - T1[1];
+        const chordDist = Math.sqrt(chordDx * chordDx + chordDy * chordDy);
+        const R = chordDist / 2.0;
+        
+        // Calculate arc center
+        const centerX = (T1[0] + T2[0]) / 2.0;
+        const centerY = (T1[1] + T2[1]) / 2.0;
+        
+        // Calculate start angle
+        const startAngle = Math.atan2(T1[1] - centerY, T1[0] - centerX);
+        
+        // Generate arc points (following Python method)
+        const segments = 12;
+        for (let j = 1; j < segments; j++) {
+          let theta: number;
+          if (turnRight) {
+            theta = startAngle - (Math.PI * j / segments);
+          } else {
+            theta = startAngle + (Math.PI * j / segments);
+          }
+          
+          const x = centerX + R * Math.cos(theta);
+          const y = centerY + R * Math.sin(theta);
+          
+          waypoints.push({ lat: y, lng: x });
+        }
+        
+        // Add the aligned T2 point
+        waypoints.push({ lat: T2[1], lng: T2[0] });
       }
     }
 
