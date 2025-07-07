@@ -251,13 +251,13 @@ async function generateTransectRoute(polygon: any, parameters: any) {
         const T1_proj = T1[0] * D[0] + T1[1] * D[1];
         const nextProj = nextTravelStart[0] * D[0] + nextTravelStart[1] * D[1];
         
-        // Check if we need to extend based on bearing direction and turn direction
+        // Check if we need to extend based on alternating pattern
         let needsExtension = false;
-        if (parameters.bearing >= 0 && parameters.bearing < 180) {
-          // Northern bearings: extend if next is ahead
+        if (i % 2 === 0) {
+          // Even lines: extend if next is ahead
           needsExtension = nextProj > T1_proj;
         } else {
-          // Southern bearings: extend if next is behind
+          // Odd lines: extend if next is behind
           needsExtension = nextProj < T1_proj;
         }
         
