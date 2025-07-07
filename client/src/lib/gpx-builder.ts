@@ -1,35 +1,11 @@
 export const generateGPX = (route: any): string => {
   const { waypoints = [], transectLines = [], name = "Transect Route" } = route;
   
-  // Escape XML special characters
-  const escapeXml = (text: string) => {
-    return text.replace(/&/g, '&amp;')
-               .replace(/</g, '&lt;')
-               .replace(/>/g, '&gt;')
-               .replace(/"/g, '&quot;')
-               .replace(/'/g, '&apos;');
-  };
-
-  const safeName = escapeXml(name);
-  const safeDesc = escapeXml(`Generated autopilot route with transect lines - ${new Date().toLocaleDateString()}`);
-  
-  const waypointElements = waypoints.map((waypoint: any, index: number) => {
-    const wpName = `WP${String(index + 1).padStart(3, '0')}`;
-    const wpDesc = `Waypoint ${index + 1} - Survey Point`;
-    
-    return `  <wpt lat="${waypoint.lat.toFixed(8)}" lon="${waypoint.lng.toFixed(8)}">
-    <name>${escapeXml(wpName)}</name>
-    <desc>${escapeXml(wpDesc)}</desc>
-    <type>waypoint</type>
-    <sym>Flag, Blue</sym>
-  </wpt>`;
-  }).join('\n');
-
-  // Create track segments from transect lines - each line as separate segment
+  // Create track segments from transect lines - simplified format like user's example
   const trackSegments = transectLines.map((line: any, index: number) => {
     const coordinates = line.geometry.coordinates;
     const trackPoints = coordinates.map((coord: number[]) => {
-      return `      <trkpt lat="${coord[1].toFixed(8)}" lon="${coord[0].toFixed(8)}">
+      return `      <trkpt lon="${coord[0]}" lat="${coord[1]}">
         <ele>0</ele>
       </trkpt>`;
     }).join('\n');
@@ -39,35 +15,12 @@ ${trackPoints}
     </trkseg>`;
   }).join('\n');
 
-  // Create navigation route from waypoints
-  const routePoints = waypoints.map((waypoint: any, index: number) => {
-    const wpName = `WP${String(index + 1).padStart(3, '0')}`;
-    const wpDesc = `Navigation point ${index + 1}`;
-    
-    return `    <rtept lat="${waypoint.lat.toFixed(8)}" lon="${waypoint.lng.toFixed(8)}">
-      <name>${escapeXml(wpName)}</name>
-      <desc>${escapeXml(wpDesc)}</desc>
-    </rtept>`;
-  }).join('\n');
-
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1" creator="GIS Route Planner" xmlns="http://www.topografix.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">
-  <metadata>
-    <name>${safeName}</name>
-    <desc>${safeDesc}</desc>
-    <time>${new Date().toISOString()}</time>
-    <keywords>survey,transect,autopilot,navigation</keywords>
-  </metadata>
-${waypointElements}
-  <rte>
-    <name>${escapeXml(safeName + ' - Navigation Route')}</name>
-    <desc>${escapeXml('Waypoint sequence for autopilot navigation')}</desc>
-${routePoints}
-  </rte>
+  // Create a single track with all transect segments
+  return `<?xml version="1.0" ?>
+<gpx xmlns="http://www.topografix.com/GPX/1/1" xalan="http://xml.apache.org/xalan" xsi="http://www.w3.org/2001/XMLSchema-instance" creator="GIS Route Planner" version="1.1">
   <trk>
-    <name>${escapeXml(safeName + ' - Survey Lines')}</name>
-    <desc>${escapeXml('Survey transect lines for data collection')}</desc>
-    <type>track</type>
+    <name>${name}</name>
+    <desc>1</desc>
 ${trackSegments}
   </trk>
 </gpx>`;
