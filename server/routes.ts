@@ -165,61 +165,9 @@ async function generateTransectRoute(polygon: any, parameters: any) {
       }
     }
 
-    // Second pass: Create alternating waypoint path with curved U-turns
+    // Second pass: Create alternating waypoint path for efficient surveying
+    // We need to modify the transect lines themselves to alternate direction
     const alternatingLines = [];
-    const turnRadiusMeters = parameters.turnRadius || Math.max(20, parameters.distance * 0.5);
-    
-    // Helper function to generate curved U-turn waypoints
-    const generateUTurnCurve = (fromPoint: number[], toPoint: number[], turnRadius: number): number[][] => {
-      const fromTurf = turf.point(fromPoint);
-      const toTurf = turf.point(toPoint);
-      const distance = turf.distance(fromTurf, toTurf, { units: 'meters' });
-      
-      if (distance < turnRadius * 2) {
-        // If points are too close, create a simple curved path
-        const bearing = turf.bearing(fromTurf, toTurf);
-        const midPoint = turf.midpoint(fromTurf, toTurf);
-        const offsetDistance = Math.min(turnRadius, distance / 3);
-        
-        // Create curve by offsetting the midpoint perpendicular to the line
-        const perpendicular = bearing + 90;
-        const curvePoint = turf.destination(midPoint, offsetDistance / 1000, perpendicular, { units: 'kilometers' });
-        
-        return [fromPoint, curvePoint.geometry.coordinates, toPoint];
-      } else {
-        // Create proper U-turn with multiple curve points
-        const bearing = turf.bearing(fromTurf, toTurf);
-        const turnRadiusKm = turnRadius / 1000;
-        
-        // Generate curve points
-        const curvePoints = [fromPoint];
-        const numCurvePoints = 5;
-        
-        for (let i = 1; i <= numCurvePoints; i++) {
-          const progress = i / (numCurvePoints + 1);
-          const currentBearing = bearing + (progress * 180); // 180 degree turn
-          const distanceFromStart = progress * distance / 1000;
-          
-          let curvePoint;
-          if (progress <= 0.5) {
-            // First half of turn
-            const offset = Math.sin(progress * Math.PI) * turnRadiusKm;
-            const alongPath = turf.destination(fromTurf, distanceFromStart, bearing, { units: 'kilometers' });
-            curvePoint = turf.destination(alongPath, offset, bearing + 90, { units: 'kilometers' });
-          } else {
-            // Second half of turn
-            const offset = Math.sin((1 - progress) * Math.PI) * turnRadiusKm;
-            const alongPath = turf.destination(fromTurf, distanceFromStart, bearing, { units: 'kilometers' });
-            curvePoint = turf.destination(alongPath, offset, bearing - 90, { units: 'kilometers' });
-          }
-          
-          curvePoints.push(curvePoint.geometry.coordinates);
-        }
-        
-        curvePoints.push(toPoint);
-        return curvePoints;
-      }
-    };
     
     for (let i = 0; i < transectLines.length; i++) {
       const line = transectLines[i];
@@ -228,41 +176,27 @@ async function generateTransectRoute(polygon: any, parameters: any) {
       const end = lineCoords[1];
       
       if (i === 0) {
-        // First line: keep original direction, add start and end waypoints
+        // First line: keep original direction
         alternatingLines.push(turf.lineString([start, end]));
         waypoints.push(
           { lat: start[1], lng: start[0] },
           { lat: end[1], lng: end[0] }
         );
       } else {
-        // For subsequent lines, check which end is closer and create curved connection
+        // For subsequent lines, check which end is closer to the last waypoint
         const lastWaypoint = waypoints[waypoints.length - 1];
-        const lastPoint = [lastWaypoint.lng, lastWaypoint.lat];
-        const distanceToStart = turf.distance(lastPoint, start, { units: 'meters' });
-        const distanceToEnd = turf.distance(lastPoint, end, { units: 'meters' });
+        const distanceToStart = turf.distance([lastWaypoint.lng, lastWaypoint.lat], start);
+        const distanceToEnd = turf.distance([lastWaypoint.lng, lastWaypoint.lat], end);
         
-        let lineStartPoint, lineEndPoint;
         if (distanceToStart < distanceToEnd) {
           // Connect to start, line goes from start to end
-          lineStartPoint = start;
-          lineEndPoint = end;
+          alternatingLines.push(turf.lineString([start, end]));
+          waypoints.push({ lat: start[1], lng: start[0] }, { lat: end[1], lng: end[0] });
         } else {
           // Connect to end, reverse the line direction (end to start)
-          lineStartPoint = end;
-          lineEndPoint = start;
+          alternatingLines.push(turf.lineString([end, start]));
+          waypoints.push({ lat: end[1], lng: end[0] }, { lat: start[1], lng: start[0] });
         }
-        
-        // Generate curved U-turn between last waypoint and this line's start
-        const curvePoints = generateUTurnCurve(lastPoint, lineStartPoint, turnRadiusMeters);
-        
-        // Add curve waypoints (skip the first point as it's the same as the last waypoint)
-        for (let j = 1; j < curvePoints.length; j++) {
-          waypoints.push({ lat: curvePoints[j][1], lng: curvePoints[j][0] });
-        }
-        
-        // Add the transect line
-        alternatingLines.push(turf.lineString([lineStartPoint, lineEndPoint]));
-        waypoints.push({ lat: lineEndPoint[1], lng: lineEndPoint[0] });
       }
     }
     
