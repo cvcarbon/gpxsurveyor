@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Route, Clock, MapPin, Navigation, Gauge } from "lucide-react";
 import { RouteParameters } from "@shared/schema";
@@ -26,6 +28,7 @@ export default function RouteGeneration({
 }: RouteGenerationProps) {
   const [localGenerating, setLocalGenerating] = useState(false);
   const [speed, setSpeed] = useState(20); // Default speed in kph
+  const [routeName, setRouteName] = useState("Survey Route 1");
 
   // Speed conversion functions
   const convertSpeed = (speedKph: number) => {
@@ -55,6 +58,7 @@ export default function RouteGeneration({
       const response = await apiRequest("POST", "/api/generate-route", {
         polygon,
         parameters,
+        name: routeName.trim() || "Survey Route 1",
       });
       
       const result = await response.json();
@@ -77,6 +81,24 @@ export default function RouteGeneration({
         <CardTitle className="text-lg">Generate Route</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Route Name Input */}
+        <div className="space-y-2">
+          <Label htmlFor="routeName" className="text-sm font-medium">
+            Route Name
+          </Label>
+          <Input
+            id="routeName"
+            type="text"
+            value={routeName}
+            onChange={(e) => setRouteName(e.target.value)}
+            placeholder="Enter route name (e.g., Survey Area 1)"
+            className="w-full"
+          />
+          <p className="text-xs text-gray-500">
+            This name will be used in the exported GPX and KML files
+          </p>
+        </div>
+
         <Button
           onClick={handleGenerateRoute}
           disabled={!polygon || isGeneratingRoute}

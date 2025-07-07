@@ -1,56 +1,74 @@
 export const generateGPX = (route: any): string => {
   const { waypoints = [], transectLines = [], name = "Transect Route" } = route;
   
-  const waypointElements = waypoints.map((waypoint: any, index: number) => `
-    <wpt lat="${waypoint.lat}" lon="${waypoint.lng}">
-      <name>WP${String(index + 1).padStart(3, '0')}</name>
-      <desc>Waypoint ${index + 1}</desc>
-      <type>waypoint</type>
-    </wpt>
-  `).join('');
+  // Escape XML special characters
+  const escapeXml = (text: string) => {
+    return text.replace(/&/g, '&amp;')
+               .replace(/</g, '&lt;')
+               .replace(/>/g, '&gt;')
+               .replace(/"/g, '&quot;')
+               .replace(/'/g, '&apos;');
+  };
 
-  // Create track segments from transect lines
+  const safeName = escapeXml(name);
+  const safeDesc = escapeXml(`Generated autopilot route with transect lines - ${new Date().toLocaleDateString()}`);
+  
+  const waypointElements = waypoints.map((waypoint: any, index: number) => {
+    const wpName = `WP${String(index + 1).padStart(3, '0')}`;
+    const wpDesc = `Waypoint ${index + 1} - Survey Point`;
+    
+    return `  <wpt lat="${waypoint.lat.toFixed(8)}" lon="${waypoint.lng.toFixed(8)}">
+    <name>${escapeXml(wpName)}</name>
+    <desc>${escapeXml(wpDesc)}</desc>
+    <type>waypoint</type>
+    <sym>Flag, Blue</sym>
+  </wpt>`;
+  }).join('\n');
+
+  // Create track segments from transect lines - each line as separate segment
   const trackSegments = transectLines.map((line: any, index: number) => {
     const coordinates = line.geometry.coordinates;
-    const trackPoints = coordinates.map((coord: number[]) => `
-        <trkpt lat="${coord[1]}" lon="${coord[0]}">
-          <ele>0</ele>
-          <name>Line${index + 1}</name>
-        </trkpt>
-      `).join('');
+    const trackPoints = coordinates.map((coord: number[]) => {
+      return `      <trkpt lat="${coord[1].toFixed(8)}" lon="${coord[0].toFixed(8)}">
+        <ele>0</ele>
+      </trkpt>`;
+    }).join('\n');
     
-    return `
-      <trkseg>
-        <name>Transect Line ${index + 1}</name>
-        ${trackPoints}
-      </trkseg>`;
-  }).join('');
+    return `    <trkseg>
+${trackPoints}
+    </trkseg>`;
+  }).join('\n');
 
-  // Also create a continuous route from waypoints for autopilot navigation
-  const routePoints = waypoints.map((waypoint: any, index: number) => `
-    <rtept lat="${waypoint.lat}" lon="${waypoint.lng}">
-      <name>WP${String(index + 1).padStart(3, '0')}</name>
-      <desc>Waypoint ${index + 1}</desc>
-    </rtept>
-  `).join('');
+  // Create navigation route from waypoints
+  const routePoints = waypoints.map((waypoint: any, index: number) => {
+    const wpName = `WP${String(index + 1).padStart(3, '0')}`;
+    const wpDesc = `Navigation point ${index + 1}`;
+    
+    return `    <rtept lat="${waypoint.lat.toFixed(8)}" lon="${waypoint.lng.toFixed(8)}">
+      <name>${escapeXml(wpName)}</name>
+      <desc>${escapeXml(wpDesc)}</desc>
+    </rtept>`;
+  }).join('\n');
 
   return `<?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1" creator="GIS Route Planner" xmlns="http://www.topografix.com/GPX/1/1">
+<gpx version="1.1" creator="GIS Route Planner" xmlns="http://www.topografix.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">
   <metadata>
-    <name>${name}</name>
-    <desc>Generated autopilot route with transect lines</desc>
+    <name>${safeName}</name>
+    <desc>${safeDesc}</desc>
     <time>${new Date().toISOString()}</time>
+    <keywords>survey,transect,autopilot,navigation</keywords>
   </metadata>
-  ${waypointElements}
+${waypointElements}
   <rte>
-    <name>${name} - Navigation Route</name>
-    <desc>Waypoint sequence for autopilot navigation</desc>
-    ${routePoints}
+    <name>${escapeXml(safeName + ' - Navigation Route')}</name>
+    <desc>${escapeXml('Waypoint sequence for autopilot navigation')}</desc>
+${routePoints}
   </rte>
   <trk>
-    <name>${name} - Transect Lines</name>
-    <desc>Survey transect lines</desc>
-    ${trackSegments}
+    <name>${escapeXml(safeName + ' - Survey Lines')}</name>
+    <desc>${escapeXml('Survey transect lines for data collection')}</desc>
+    <type>track</type>
+${trackSegments}
   </trk>
 </gpx>`;
 };
@@ -58,52 +76,67 @@ export const generateGPX = (route: any): string => {
 export const generateKML = (route: any): string => {
   const { waypoints = [], transectLines = [], name = "Transect Route" } = route;
   
+  // Escape XML special characters for KML
+  const escapeXml = (text: string) => {
+    return text.replace(/&/g, '&amp;')
+               .replace(/</g, '&lt;')
+               .replace(/>/g, '&gt;')
+               .replace(/"/g, '&quot;')
+               .replace(/'/g, '&apos;');
+  };
+
+  const safeName = escapeXml(name);
+  const safeDesc = escapeXml(`Generated autopilot route with transect lines - ${new Date().toLocaleDateString()}`);
+  
   // Create waypoint placemarks
-  const waypointPlacemarks = waypoints.map((waypoint: any, index: number) => `
-    <Placemark>
-      <name>WP${String(index + 1).padStart(3, '0')}</name>
-      <description>Waypoint ${index + 1}</description>
+  const waypointPlacemarks = waypoints.map((waypoint: any, index: number) => {
+    const wpName = `WP${String(index + 1).padStart(3, '0')}`;
+    const wpDesc = `Waypoint ${index + 1} - Survey Point`;
+    
+    return `    <Placemark>
+      <name>${escapeXml(wpName)}</name>
+      <description>${escapeXml(wpDesc)}</description>
       <styleUrl>#waypointStyle</styleUrl>
       <Point>
-        <coordinates>${waypoint.lng},${waypoint.lat},0</coordinates>
+        <coordinates>${waypoint.lng.toFixed(8)},${waypoint.lat.toFixed(8)},0</coordinates>
       </Point>
-    </Placemark>
-  `).join('');
+    </Placemark>`;
+  }).join('\n');
 
   // Create transect line placemarks
   const linePlacemarks = transectLines.map((line: any, index: number) => {
     const coordinates = line.geometry.coordinates;
-    const coordString = coordinates.map((coord: number[]) => `${coord[0]},${coord[1]},0`).join(' ');
+    const coordString = coordinates.map((coord: number[]) => `${coord[0].toFixed(8)},${coord[1].toFixed(8)},0`).join(' ');
+    const lineName = `Transect Line ${index + 1}`;
+    const lineDesc = `Survey transect line ${index + 1}`;
     
-    return `
-    <Placemark>
-      <name>Transect Line ${index + 1}</name>
-      <description>Survey transect line ${index + 1}</description>
+    return `    <Placemark>
+      <name>${escapeXml(lineName)}</name>
+      <description>${escapeXml(lineDesc)}</description>
       <styleUrl>#lineStyle</styleUrl>
       <LineString>
         <tessellate>1</tessellate>
         <coordinates>${coordString}</coordinates>
       </LineString>
     </Placemark>`;
-  }).join('');
+  }).join('\n');
 
   // Create a continuous path for autopilot navigation
-  const navigationPath = waypoints.length > 0 ? `
-    <Placemark>
-      <name>Navigation Path</name>
-      <description>Autopilot navigation path connecting all waypoints</description>
+  const navigationPath = waypoints.length > 0 ? `    <Placemark>
+      <name>${escapeXml('Navigation Path')}</name>
+      <description>${escapeXml('Autopilot navigation path connecting all waypoints')}</description>
       <styleUrl>#navigationStyle</styleUrl>
       <LineString>
         <tessellate>1</tessellate>
-        <coordinates>${waypoints.map((wp: any) => `${wp.lng},${wp.lat},0`).join(' ')}</coordinates>
+        <coordinates>${waypoints.map((wp: any) => `${wp.lng.toFixed(8)},${wp.lat.toFixed(8)},0`).join(' ')}</coordinates>
       </LineString>
     </Placemark>` : '';
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2">
   <Document>
-    <name>${name}</name>
-    <description>Generated autopilot route with transect lines and navigation path</description>
+    <name>${safeName}</name>
+    <description>${safeDesc}</description>
     
     <!-- Styles -->
     <Style id="waypointStyle">
@@ -130,9 +163,9 @@ export const generateKML = (route: any): string => {
       </LineStyle>
     </Style>
     
-    ${waypointPlacemarks}
-    ${linePlacemarks}
-    ${navigationPath}
+${waypointPlacemarks}
+${linePlacemarks}
+${navigationPath}
   </Document>
 </kml>`;
 };

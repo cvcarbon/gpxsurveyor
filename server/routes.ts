@@ -58,7 +58,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Generate transect route
   app.post("/api/generate-route", async (req, res) => {
     try {
-      const { polygon, parameters } = req.body;
+      const { polygon, parameters, name } = req.body;
       
       if (!polygon || !parameters) {
         return res.status(400).json({ message: "Polygon and parameters required" });
@@ -70,9 +70,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Generate transect lines
       const route = await generateTransectRoute(polygon, validParams);
       
+      // Use provided name or generate default
+      const routeName = name?.trim() || `Route ${Date.now()}`;
+      
       // Save route
       const savedRoute = await storage.createRoute({
-        name: `Route ${Date.now()}`,
+        name: routeName,
         polygon,
         distance: validParams.distance,
         bearing: validParams.bearing,
