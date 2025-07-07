@@ -165,7 +165,9 @@ async function generateTransectRoute(polygon: any, parameters: any) {
       }
     }
 
-    // Second pass: Create alternating waypoint path
+    // Second pass: Create alternating waypoint path with curved U-turns
+    const turnRadiusMeters = parameters.turnRadius || (parameters.distance * 0.5);
+    
     for (let i = 0; i < transectLines.length; i++) {
       const line = transectLines[i];
       const lineCoords = line.geometry.coordinates;
@@ -177,17 +179,90 @@ async function generateTransectRoute(polygon: any, parameters: any) {
         waypoints.push({ lat: start[1], lng: start[0] });
         waypoints.push({ lat: end[1], lng: end[0] });
       } else {
-        // For subsequent lines, check which end is closer to the last waypoint
-        const lastWaypoint = waypoints[waypoints.length - 1];
-        const distanceToStart = turf.distance([lastWaypoint.lng, lastWaypoint.lat], start);
-        const distanceToEnd = turf.distance([lastWaypoint.lng, lastWaypoint.lat], end);
+        // Get previous line info
+        const prevLine = transectLines[i - 1];
+        const prevStart = prevLine.geometry.coordinates[0];
+        const prevEnd = prevLine.geometry.coordinates[1];
         
-        if (distanceToStart < distanceToEnd) {
-          // Connect to start, then go to end
+        // Determine where we ended on the previous line
+        const lastWaypoint = waypoints[waypoints.length - 1];
+        const endedAtPrevStart = (Math.abs(lastWaypoint.lat - prevStart[1]) < 0.00001 && 
+                                  Math.abs(lastWaypoint.lng - prevStart[0]) < 0.00001);
+        const fromPoint = endedAtPrevStart ? prevStart : prevEnd;
+        
+        // Check which end of current line is closer
+        const distanceToStart = turf.distance(fromPoint, start);
+        const distanceToEnd = turf.distance(fromPoint, end);
+        const goingToStart = distanceToStart < distanceToEnd;
+        const toPoint = goingToStart ? start : end;
+        
+        // Calculate bearings for the curve
+        const exitBearing = endedAtPrevStart 
+          ? turf.bearing(prevEnd, prevStart) // Reverse bearing if we ended at start
+          : turf.bearing(prevStart, prevEnd); // Normal bearing if we ended at end
+          
+        const entryBearing = goingToStart
+          ? turf.bearing(start, end) // Normal bearing if entering at start
+          : turf.bearing(end, start); // Reverse bearing if entering at end
+        
+        // Create a simple curved U-turn
+        const lateralDistance = turf.distance(fromPoint, toPoint) * 1000; // meters
+        const effectiveRadius = Math.min(turnRadiusMeters, lateralDistance * 0.4);
+        
+        // Extend beyond the line endpoints
+        const extensionDistance = effectiveRadius;
+        const extendedFrom = turf.destination(fromPoint, extensionDistance, exitBearing, {units: 'meters'});
+        const extendedTo = turf.destination(toPoint, extensionDistance, entryBearing + 180, {units: 'meters'});
+        
+        // Generate curve points
+        const numCurvePoints = 15;
+        
+        // Add extension from line end
+        for (let j = 1; j <= 3; j++) {
+          const progress = j / 3;
+          const pt = turf.along(
+            turf.lineString([fromPoint, extendedFrom.geometry.coordinates]),
+            progress * extensionDistance,
+            {units: 'meters'}
+          );
+          waypoints.push({ lat: pt.geometry.coordinates[1], lng: pt.geometry.coordinates[0] });
+        }
+        
+        // Create arc between extended points
+        for (let j = 1; j < numCurvePoints; j++) {
+          const progress = j / numCurvePoints;
+          
+          // Simple interpolation for the arc
+          const arcLng = extendedFrom.geometry.coordinates[0] + 
+                        (extendedTo.geometry.coordinates[0] - extendedFrom.geometry.coordinates[0]) * progress;
+          const arcLat = extendedFrom.geometry.coordinates[1] + 
+                        (extendedTo.geometry.coordinates[1] - extendedFrom.geometry.coordinates[1]) * progress;
+          
+          // Add outward bulge to create arc
+          const midProgress = 1 - Math.abs(2 * progress - 1); // Peak at 0.5
+          const bulgeDistance = effectiveRadius * midProgress * 0.5;
+          const perpBearing = ((exitBearing + entryBearing) / 2 + 90) % 360;
+          
+          const bulgePoint = turf.destination([arcLng, arcLat], bulgeDistance, perpBearing, {units: 'meters'});
+          waypoints.push({ lat: bulgePoint.geometry.coordinates[1], lng: bulgePoint.geometry.coordinates[0] });
+        }
+        
+        // Add approach to the next line
+        for (let j = 3; j >= 1; j--) {
+          const progress = j / 3;
+          const pt = turf.along(
+            turf.lineString([toPoint, extendedTo.geometry.coordinates]),
+            progress * extensionDistance,
+            {units: 'meters'}
+          );
+          waypoints.push({ lat: pt.geometry.coordinates[1], lng: pt.geometry.coordinates[0] });
+        }
+        
+        // Add the transect line endpoints
+        if (goingToStart) {
           waypoints.push({ lat: start[1], lng: start[0] });
           waypoints.push({ lat: end[1], lng: end[0] });
         } else {
-          // Connect to end, then go to start (reverse direction)
           waypoints.push({ lat: end[1], lng: end[0] });
           waypoints.push({ lat: start[1], lng: start[0] });
         }
