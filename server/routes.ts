@@ -166,30 +166,43 @@ async function generateTransectRoute(polygon: any, parameters: any) {
     }
 
     // Second pass: Create alternating waypoint path for efficient surveying
+    // We need to modify the transect lines themselves to alternate direction
+    const alternatingLines = [];
+    
     for (let i = 0; i < transectLines.length; i++) {
       const line = transectLines[i];
       const lineCoords = line.geometry.coordinates;
-      const start = { lat: lineCoords[0][1], lng: lineCoords[0][0] };
-      const end = { lat: lineCoords[1][1], lng: lineCoords[1][0] };
+      const start = lineCoords[0];
+      const end = lineCoords[1];
       
       if (i === 0) {
-        // First line: go from start to end
-        waypoints.push(start, end);
+        // First line: keep original direction
+        alternatingLines.push(turf.lineString([start, end]));
+        waypoints.push(
+          { lat: start[1], lng: start[0] },
+          { lat: end[1], lng: end[0] }
+        );
       } else {
-        // For subsequent lines, connect to the closest end of the previous line
+        // For subsequent lines, check which end is closer to the last waypoint
         const lastWaypoint = waypoints[waypoints.length - 1];
-        const distanceToStart = turf.distance([lastWaypoint.lng, lastWaypoint.lat], [start.lng, start.lat]);
-        const distanceToEnd = turf.distance([lastWaypoint.lng, lastWaypoint.lat], [end.lng, end.lat]);
+        const distanceToStart = turf.distance([lastWaypoint.lng, lastWaypoint.lat], start);
+        const distanceToEnd = turf.distance([lastWaypoint.lng, lastWaypoint.lat], end);
         
         if (distanceToStart < distanceToEnd) {
-          // Connect to start, then go to end
-          waypoints.push(start, end);
+          // Connect to start, line goes from start to end
+          alternatingLines.push(turf.lineString([start, end]));
+          waypoints.push({ lat: start[1], lng: start[0] }, { lat: end[1], lng: end[0] });
         } else {
-          // Connect to end, then go to start (reverse direction)
-          waypoints.push(end, start);
+          // Connect to end, reverse the line direction (end to start)
+          alternatingLines.push(turf.lineString([end, start]));
+          waypoints.push({ lat: end[1], lng: end[0] }, { lat: start[1], lng: start[0] });
         }
       }
     }
+    
+    // Replace transectLines with the alternating version
+    transectLines.length = 0;
+    transectLines.push(...alternatingLines);
     
     // Calculate total distance
     let totalDistance = 0;
