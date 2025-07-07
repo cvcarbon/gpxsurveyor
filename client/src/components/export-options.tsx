@@ -62,15 +62,18 @@ export default function ExportOptions({
   };
 
   return (
-    <Card className="border-0 rounded-none">
+    <Card className="border-0 border-t border-gray-100 rounded-none">
       <CardHeader>
         <CardTitle className="text-lg">Export Route</CardTitle>
+        {!hasRoute && (
+          <p className="text-sm text-gray-500">Generate a route first to enable export options</p>
+        )}
       </CardHeader>
       <CardContent className="space-y-3">
         <Button
           onClick={handleExportGPX}
           disabled={!hasRoute}
-          className="w-full bg-success hover:bg-success/90"
+          className={`w-full ${hasRoute ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-gray-100 text-gray-400'}`}
         >
           <Download className="h-4 w-4 mr-2" />
           Export as GPX
@@ -80,7 +83,7 @@ export default function ExportOptions({
           onClick={handleExportKML}
           disabled={!hasRoute}
           variant="outline"
-          className="w-full"
+          className={`w-full ${!hasRoute ? 'text-gray-400 border-gray-200' : ''}`}
         >
           <Download className="h-4 w-4 mr-2" />
           Export as KML
@@ -91,7 +94,7 @@ export default function ExportOptions({
             disabled={!hasRoute}
             variant="outline"
             size="sm"
-            className="flex-1"
+            className={`flex-1 ${!hasRoute ? 'text-gray-400 border-gray-200' : ''}`}
           >
             <Share className="h-4 w-4 mr-2" />
             Share
@@ -100,7 +103,7 @@ export default function ExportOptions({
             disabled={!hasRoute}
             variant="outline"
             size="sm"
-            className="flex-1"
+            className={`flex-1 ${!hasRoute ? 'text-gray-400 border-gray-200' : ''}`}
           >
             <Save className="h-4 w-4 mr-2" />
             Save
