@@ -253,8 +253,11 @@ async function generateTransectRoute(polygon: any, parameters: any) {
         
         // If next line is ahead in survey direction, extend current line
         if (nextProj > T1_proj) {
-          const extensionDistance = (nextProj - T1_proj) + 50; // Add 50m buffer
-          T1 = turf.destination(T1, extensionDistance, parameters.bearing, {units: 'meters'}).geometry.coordinates;
+          const extensionInSurveyDirection = (nextProj - T1_proj) + 0.0001; // Small buffer in coordinate units
+          T1 = [
+            T1[0] + extensionInSurveyDirection * D[0],
+            T1[1] + extensionInSurveyDirection * D[1]
+          ];
           
           // Add waypoint for the extended endpoint
           waypoints.push({ lat: T1[1], lng: T1[0] });
