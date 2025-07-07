@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Download, FileText, Share, Save } from "lucide-react";
-import { generateGPX } from "@/lib/gpx-builder";
+import { generateGPX, generateKML } from "@/lib/gpx-builder";
 
 interface ExportOptionsProps {
   generatedRoute: any;
@@ -44,7 +44,7 @@ export default function ExportOptions({
     }
 
     try {
-      // Simple KML export
+      // Export KML with transect lines and navigation path
       const kmlContent = generateKML(generatedRoute);
       const blob = new Blob([kmlContent], { type: "application/vnd.google-earth.kml+xml" });
       const url = URL.createObjectURL(blob);
@@ -59,27 +59,6 @@ export default function ExportOptions({
     } catch (error) {
       onError("Failed to export KML file");
     }
-  };
-
-  const generateKML = (route: any) => {
-    const waypoints = route.waypoints || [];
-    const placemarks = waypoints.map((waypoint: any, index: number) => `
-      <Placemark>
-        <name>Waypoint ${index + 1}</name>
-        <Point>
-          <coordinates>${waypoint.lng},${waypoint.lat},0</coordinates>
-        </Point>
-      </Placemark>
-    `).join("");
-
-    return `<?xml version="1.0" encoding="UTF-8"?>
-<kml xmlns="http://www.opengis.net/kml/2.2">
-  <Document>
-    <name>Transect Route</name>
-    <description>Generated autopilot route</description>
-    ${placemarks}
-  </Document>
-</kml>`;
   };
 
   return (
