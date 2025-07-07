@@ -28,13 +28,30 @@ export default function MapContainer({
     if (typeof window !== "undefined" && mapRef.current && !mapInstanceRef.current) {
       // Dynamically import Leaflet to avoid SSR issues
       import("leaflet").then((L) => {
+        // Fix default marker icons issue
+        delete (L.Icon.Default.prototype as any)._getIconUrl;
+        L.Icon.Default.mergeOptions({
+          iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
+          iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
+          shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+        });
+
         // Initialize map
         const map = L.map(mapRef.current!).setView([40.7128, -74.0060], 10);
         
-        // Add tile layer
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          attribution: '© OpenStreetMap contributors'
-        }).addTo(map);
+        // Add tile layer with better configuration
+        const tileLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+          maxZoom: 19,
+          minZoom: 1,
+          crossOrigin: true
+        });
+        
+        tileLayer.on('tileerror', (e) => {
+          console.warn('Tile loading error:', e);
+        });
+        
+        tileLayer.addTo(map);
 
         // Track mouse coordinates
         map.on('mousemove', (e: any) => {

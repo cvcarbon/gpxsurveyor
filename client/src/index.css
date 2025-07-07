@@ -1,4 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://unpkg.com/leaflet@1.9.4/dist/leaflet.css');
+@import url('https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css');
 
 @tailwind base;
 @tailwind components;
@@ -72,6 +74,20 @@
   .leaflet-container {
     height: 100vh;
     width: 100%;
+    z-index: 1;
+  }
+  
+  .leaflet-control-container .leaflet-routing-container-hide {
+    display: none;
+  }
+  
+  /* Fix for Leaflet tile rendering */
+  .leaflet-tile {
+    pointer-events: auto;
+  }
+  
+  .leaflet-tile-container {
+    overflow: visible;
   }
 
   .sidebar-transition {
