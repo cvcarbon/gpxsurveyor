@@ -120,6 +120,7 @@ NODE_ENV=production|development
 
 ## Changelog
 - July 07, 2025. Initial setup
+- July 07, 2025. Enhanced route generation with speed control slider featuring multiple units (kph, mph, knots) and dynamic time estimation
 
 ## User Preferences
 
