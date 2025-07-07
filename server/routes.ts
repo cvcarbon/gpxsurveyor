@@ -240,11 +240,21 @@ async function generateTransectRoute(polygon: any, parameters: any) {
           nextTravelStart = nextEnd;
         }
         
-        // Current turn direction - flip for bearings between 90-270 degrees
+        // Current turn direction - determine based on bearing and line index
         let turnRight = (i % 2 === 0);
-        if (parameters.bearing > 90 && parameters.bearing < 270) {
-          turnRight = !turnRight; // Flip for southern hemisphere bearings
+        // For 0-degree bearing, keep original logic
+        // For other bearings, adjust based on quadrant
+        if (parameters.bearing >= 45 && parameters.bearing < 135) {
+          // East quadrant (45-135 degrees)
+          turnRight = !turnRight;
+        } else if (parameters.bearing >= 135 && parameters.bearing < 225) {
+          // South quadrant (135-225 degrees)
+          turnRight = !turnRight;
+        } else if (parameters.bearing >= 225 && parameters.bearing < 315) {
+          // West quadrant (225-315 degrees)
+          turnRight = !turnRight;
         }
+        // North quadrant (315-45 degrees) keeps original logic
         
         // Following Python method: align points in survey direction
         let T1 = travelEnd;
@@ -252,20 +262,29 @@ async function generateTransectRoute(polygon: any, parameters: any) {
         const nextProj = nextTravelStart[0] * D[0] + nextTravelStart[1] * D[1];
         
         // Check if we need to extend based on alternating pattern
+        // Use a more robust extension logic that considers the geometric relationship
         let needsExtension = false;
-        if (i % 2 === 0) {
-          // Even lines: extend if next is ahead
-          needsExtension = nextProj > T1_proj;
-        } else {
-          // Odd lines: extend if next is behind
-          needsExtension = nextProj < T1_proj;
+        const projectionDiff = nextProj - T1_proj;
+        
+        // Extension logic: extend if the next line's start is significantly ahead/behind
+        // in the survey direction compared to current line's end
+        if (Math.abs(projectionDiff) > 0.00001) { // Only extend if there's a meaningful difference
+          if (i % 2 === 0) {
+            // Even lines: extend if next is ahead in survey direction
+            needsExtension = projectionDiff > 0;
+          } else {
+            // Odd lines: extend if next is behind in survey direction
+            needsExtension = projectionDiff < 0;
+          }
         }
         
         if (needsExtension) {
-          const extensionInSurveyDirection = Math.abs(nextProj - T1_proj) + 0.0001; // Small buffer
+          const extensionInSurveyDirection = Math.abs(projectionDiff) + 0.0002; // Slightly larger buffer
+          const extensionDirection = projectionDiff > 0 ? 1 : -1;
+          
           T1 = [
-            T1[0] + extensionInSurveyDirection * D[0],
-            T1[1] + extensionInSurveyDirection * D[1]
+            T1[0] + extensionInSurveyDirection * extensionDirection * D[0],
+            T1[1] + extensionInSurveyDirection * extensionDirection * D[1]
           ];
           
           // Add waypoint for the extended endpoint
@@ -278,33 +297,40 @@ async function generateTransectRoute(polygon: any, parameters: any) {
         const chordDx = T2[0] - T1[0];
         const chordDy = T2[1] - T1[1];
         const chordDist = Math.sqrt(chordDx * chordDx + chordDy * chordDy);
-        const R = chordDist / 2.0;
         
-        // Calculate arc center
-        const centerX = (T1[0] + T2[0]) / 2.0;
-        const centerY = (T1[1] + T2[1]) / 2.0;
-        
-        // Calculate start angle
-        const startAngle = Math.atan2(T1[1] - centerY, T1[0] - centerX);
-        
-        // Generate arc points (following Python method)
-        const segments = 12;
-        for (let j = 1; j < segments; j++) {
-          let theta: number;
-          if (turnRight) {
-            theta = startAngle - (Math.PI * j / segments);
-          } else {
-            theta = startAngle + (Math.PI * j / segments);
+        // Ensure minimum chord distance for proper curve generation
+        if (chordDist < 0.00001) {
+          // If points are too close, just add a direct waypoint
+          waypoints.push({ lat: T2[1], lng: T2[0] });
+        } else {
+          const R = chordDist / 2.0;
+          
+          // Calculate arc center
+          const centerX = (T1[0] + T2[0]) / 2.0;
+          const centerY = (T1[1] + T2[1]) / 2.0;
+          
+          // Calculate start angle
+          const startAngle = Math.atan2(T1[1] - centerY, T1[0] - centerX);
+          
+          // Generate arc points (following Python method)
+          const segments = 12;
+          for (let j = 1; j < segments; j++) {
+            let theta: number;
+            if (turnRight) {
+              theta = startAngle - (Math.PI * j / segments);
+            } else {
+              theta = startAngle + (Math.PI * j / segments);
+            }
+            
+            const x = centerX + R * Math.cos(theta);
+            const y = centerY + R * Math.sin(theta);
+            
+            waypoints.push({ lat: y, lng: x });
           }
           
-          const x = centerX + R * Math.cos(theta);
-          const y = centerY + R * Math.sin(theta);
-          
-          waypoints.push({ lat: y, lng: x });
+          // Add the aligned T2 point
+          waypoints.push({ lat: T2[1], lng: T2[0] });
         }
-        
-        // Add the aligned T2 point
-        waypoints.push({ lat: T2[1], lng: T2[0] });
       }
     }
 
