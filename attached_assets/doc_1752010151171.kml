@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+ xsi:schemaLocation="http://www.opengis.net/kml/2.2 http://schemas.opengis.net/kml/2.2.0/ogckml22.xsd http://www.google.com/kml/ext/2.2 http://code.google.com/apis/kml/schema/kml22gx.xsd">
+<Document id="survey">
+  <name>survey</name>
+  <snippet></snippet>
+  <Folder id="FeatureLayer0">
+    <name>survey</name>
+    <snippet></snippet>
+    <Placemark id="ID_00000">
+      <name>214</name>
+      <snippet></snippet>
+      <description><![CDATA[<html xmlns:fo="http://www.w3.org/1999/XSL/Format" xmlns:msxsl="urn:schemas-microsoft-com:xslt">
+<head>
+<META http-equiv="Content-Type" content="text/html">
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+</head>
+<body style="margin:0px 0px 0px 0px;overflow:auto;background:#FFFFFF;">
+<table style="font-family:Arial,Verdana,Times;font-size:12px;text-align:left;width:100%;border-collapse:collapse;padding:3px 3px 3px 3px">
+<tr style="text-align:center;font-weight:bold;background:#9CBCE2">
+<td>214</td>
+</tr>
+<tr>
+<td>
+<table style="font-family:Arial,Verdana,Times;font-size:12px;text-align:left;width:100%;border-spacing:0px; padding:3px 3px 3px 3px">
+<tr>
+<td>ObjectID</td>
+<td>214</td>
+</tr>
+<tr bgcolor="#D4E4F3">
+<td>GlobalID</td>
+<td>{e60453fe-4e60-42e8-9155-37bee3620142}</td>
+</tr>
+<tr>
+<td>Shape__Area</td>
+<td>0.000579</td>
+</tr>
+<tr bgcolor="#D4E4F3">
+<td>Shape__Length</td>
+<td>0.121741</td>
+</tr>
+<tr>
+<td>CreationDate</td>
+<td>7/8/2025 7:01:17 PM</td>
+</tr>
+<tr bgcolor="#D4E4F3">
+<td>Creator</td>
+<td>johnyjurisich_CVCarbon</td>
+</tr>
+<tr>
+<td>EditDate</td>
+<td>7/8/2025 7:11:27 PM</td>
+</tr>
+<tr bgcolor="#D4E4F3">
+<td>Editor</td>
+<td>johnyjurisich_CVCarbon</td>
+</tr>
+<tr>
+<td>amount</td>
+<td>99</td>
+</tr>
+<tr bgcolor="#D4E4F3">
+<td>unit</td>
+<td>Tons</td>
+</tr>
+<tr>
+<td>dollar_value</td>
+<td>&lt;Null&gt;</td>
+</tr>
+<tr bgcolor="#D4E4F3">
+<td>lease_number</td>
+<td>&lt;Null&gt;</td>
+</tr>
+<tr>
+<td>status</td>
+<td>&lt;Null&gt;</td>
+</tr>
+<tr bgcolor="#D4E4F3">
+<td>placement_date</td>
+<td>7/8/2025 7:01:07 PM</td>
+</tr>
+</table>
+</td>
+</tr>
+</table>
+</body><script type="text/javascript">
+				function changeImage(attElement, nameElement) {
+				document.getElementById('imageAttachment').src = attElement;
+				document.getElementById('imageName').innerHTML = nameElement;}
+			</script></html>
+]]></description>
+      <styleUrl>#PolyStyle00</styleUrl>
+      <MultiGeometry>
+        <Polygon>
+          <extrude>0</extrude><altitudeMode>clampToGround</altitudeMode>
+          <outerBoundaryIs><LinearRing><coordinates> -94.71311035199994,29.47911754400008,0 -94.71072640399996,29.47888475100007,0 -94.71370666299998,29.48106106400007,0 -94.71444469799997,29.48237344500006,0 -94.71638967599995,29.48444001200005,0 -94.71575883599996,29.48661644400005,0 -94.72555672999994,29.49540299200004,0 -94.72645376799994,29.49365890500007,0 -94.72708994099997,29.49181330300007,0 -94.73162897099996,29.48943578000006,0 -94.73020679999996,29.48675255600006,0 -94.73031599599994,29.48007550300002,0 -94.73469406399994,29.47817966400004,0 -94.71123053399998,29.45662719100005,0 -94.70670102099996,29.46153850900004,0 -94.70227444999995,29.46203249500007,0 -94.70677772199997,29.46495532000006,0 -94.70028755099997,29.47062631700004,0 -94.71311035199994,29.47911754400008,0</coordinates></LinearRing></outerBoundaryIs>
+        </Polygon>
+      </MultiGeometry>
+    </Placemark>
+  </Folder>
+  <Style id="PolyStyle00">
+    <LabelStyle>
+      <color>00000000</color>
+      <scale>0.000000</scale>
+    </LabelStyle>
+    <LineStyle>
+      <color>ffffb200</color>
+      <width>2.000000</width>
+    </LineStyle>
+    <PolyStyle>
+      <color>30ffb200</color>
+      <outline>1</outline>
+    </PolyStyle>
+  </Style>
+</Document>
+</kml>

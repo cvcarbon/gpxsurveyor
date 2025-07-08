@@ -407,28 +407,59 @@ const parseSHP = async (buffer: Buffer): Promise<{ polygon: any; data: any }> =>
 
 const extractKMLCoordinates = (kmlData: any): number[][] | null => {
   try {
+    console.log("Extracting KML coordinates from:", JSON.stringify(kmlData, null, 2));
+    
     // Navigate KML structure to find coordinates
     const doc = kmlData.kml?.Document?.[0] || kmlData.kml;
-    const placemarks = doc?.Placemark || [];
+    const folder = doc?.Folder?.[0] || doc;
+    const placemarks = folder?.Placemark || doc?.Placemark || [];
+    
+    console.log("Found placemarks:", placemarks.length);
     
     for (const placemark of placemarks) {
+      console.log("Processing placemark:", Object.keys(placemark));
+      
+      // Check for MultiGeometry first (like in your KML)
+      const multiGeometry = placemark.MultiGeometry?.[0];
+      if (multiGeometry) {
+        console.log("Found MultiGeometry");
+        const polygon = multiGeometry.Polygon?.[0];
+        if (polygon) {
+          const coords = polygon.outerBoundaryIs?.[0]?.LinearRing?.[0]?.coordinates?.[0];
+          if (coords) {
+            console.log("Found coordinates in MultiGeometry:", coords.substring(0, 100));
+            return parseCoordinateString(coords);
+          }
+        }
+      }
+      
+      // Check for direct Polygon
       const polygon = placemark.Polygon?.[0];
       if (polygon) {
+        console.log("Found direct Polygon");
         const coords = polygon.outerBoundaryIs?.[0]?.LinearRing?.[0]?.coordinates?.[0];
         if (coords) {
-          // Parse coordinate string "lng,lat,alt lng,lat,alt ..."
-          const coordPairs = coords.trim().split(/\s+/);
-          return coordPairs.map((pair: string) => {
-            const [lng, lat] = pair.split(',').map(Number);
-            return [lng, lat];
-          });
+          console.log("Found coordinates in Polygon:", coords.substring(0, 100));
+          return parseCoordinateString(coords);
         }
       }
     }
     
+    console.log("No coordinates found in KML");
     return null;
   } catch (error) {
     console.error("Error extracting KML coordinates:", error);
     return null;
   }
+};
+
+const parseCoordinateString = (coords: string): number[][] => {
+  // Parse coordinate string "lng,lat,alt lng,lat,alt ..." or "lng,lat,alt\nlng,lat,alt..."
+  const coordPairs = coords.trim().split(/[\s\n]+/).filter(pair => pair.trim().length > 0);
+  console.log("Coordinate pairs found:", coordPairs.length);
+  
+  return coordPairs.map((pair: string) => {
+    const [lng, lat, alt] = pair.split(',').map(Number);
+    return [lng, lat]; // Only return lng, lat (ignore altitude)
+  }).filter(coord => !isNaN(coord[0]) && !isNaN(coord[1])); // Filter out invalid coordinates
 };
