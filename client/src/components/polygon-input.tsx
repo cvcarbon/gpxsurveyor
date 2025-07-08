@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { CloudUpload, FileText, Trash2, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, apiFormDataRequest } from "@/lib/queryClient";
 
 interface PolygonInputProps {
   polygon: any;
@@ -33,12 +33,7 @@ export default function PolygonInput({
         formData.append("files", file);
       });
 
-      const response = await apiRequest("POST", "/api/upload-polygon", formData);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
+      const response = await apiFormDataRequest("POST", "/api/upload-polygon", formData);
       const result = await response.json();
 
       if (result.polygons && result.polygons.length > 0) {
