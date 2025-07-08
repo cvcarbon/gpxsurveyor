@@ -13,8 +13,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Upload polygon files (KML/SHP)
   app.post("/api/upload-polygon", upload.array("files"), async (req: any, res: Response) => {
     try {
+      console.log("File upload request received");
+      console.log("Request files:", req.files);
+      console.log("Request body:", req.body);
+      
       const files = req.files as Express.Multer.File[];
       if (!files || files.length === 0) {
+        console.log("No files found in request");
         return res.status(400).json({ message: "No files uploaded" });
       }
 
@@ -22,20 +27,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const polygons = [];
 
       for (const file of files) {
+        console.log(`Processing file: ${file.originalname}, type: ${file.mimetype}`);
         let polygon = null;
         let fileData = null;
 
         if (file.mimetype.includes("kml") || file.originalname.endsWith(".kml")) {
+          console.log("Parsing KML file");
           const result = await parseKML(file.buffer);
           polygon = result.polygon;
           fileData = result.data;
         } else if (file.mimetype.includes("zip") || file.originalname.endsWith(".shp")) {
+          console.log("Parsing SHP file");
           const result = await parseSHP(file.buffer);
           polygon = result.polygon;
           fileData = result.data;
+        } else {
+          console.log(`Unsupported file type: ${file.mimetype}`);
+          continue;
         }
 
         if (polygon) {
+          console.log("Polygon extracted successfully");
           const uploadedFile = await storage.createUploadedFile({
             fileName: file.originalname,
             fileType: file.originalname.endsWith(".kml") ? "kml" : "shp",
@@ -45,13 +57,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           uploadedFiles.push(uploadedFile);
           polygons.push(polygon);
+        } else {
+          console.log("No polygon extracted from file");
         }
       }
 
+      console.log(`Successfully processed ${polygons.length} files`);
       res.json({ files: uploadedFiles, polygons });
     } catch (error) {
       console.error("File upload error:", error);
-      res.status(500).json({ message: "Failed to process uploaded files" });
+      res.status(500).json({ message: "Failed to process uploaded files", error: error.message });
     }
   });
 

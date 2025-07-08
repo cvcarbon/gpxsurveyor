@@ -21,7 +21,7 @@ export default function PolygonInput({
   onStartDrawing,
   onClearMap,
 }: PolygonInputProps) {
-  const [activeTab, setActiveTab] = useState<"upload" | "draw">("upload");
+  const [activeTab, setActiveTab] = useState<"upload" | "draw">("draw");
   const [uploadedFiles, setUploadedFiles] = useState<any[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -34,32 +34,44 @@ export default function PolygonInput({
       });
 
       const response = await apiRequest("POST", "/api/upload-polygon", formData);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
       const result = await response.json();
 
       if (result.polygons && result.polygons.length > 0) {
-        setUploadedFiles(result.files);
+        setUploadedFiles(result.files || []);
         onPolygonChange(result.polygons[0]); // Use first polygon
+      } else {
+        onError("No valid polygons found in uploaded files");
       }
     } catch (error) {
-      onError("Failed to upload and process files");
+      console.error("File upload error:", error);
+      onError("Failed to upload and process files: " + (error instanceof Error ? error.message : "Unknown error"));
     }
   };
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     setIsDragOver(true);
   };
 
-  const handleDragLeave = () => {
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     setIsDragOver(false);
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     setIsDragOver(false);
     
     const files = e.dataTransfer.files;
-    if (files.length > 0) {
+    if (files && files.length > 0) {
       handleFileUpload(files);
     }
   };
@@ -101,20 +113,20 @@ export default function PolygonInput({
         {/* Tab Toggle */}
         <div className="flex rounded-lg bg-gray-100 p-1">
           <Button
-            variant={activeTab === "upload" ? "default" : "ghost"}
-            size="sm"
-            onClick={() => setActiveTab("upload")}
-            className="flex-1"
-          >
-            Upload File
-          </Button>
-          <Button
             variant={activeTab === "draw" ? "default" : "ghost"}
             size="sm"
             onClick={() => setActiveTab("draw")}
             className="flex-1"
           >
             Draw Polygon
+          </Button>
+          <Button
+            variant={activeTab === "upload" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setActiveTab("upload")}
+            className="flex-1"
+          >
+            Upload File
           </Button>
         </div>
 
