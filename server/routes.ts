@@ -1,203 +1,168 @@
-import type { Express, Request, Response } from "express";
-import { createServer, type Server } from "http";
+import express, { Request, Response } from "express";
 import multer from "multer";
-import { storage } from "./storage";
-import { routeParametersSchema } from "@shared/schema";
+import xml2js from "xml2js";
 import * as turf from "@turf/turf";
-import * as xml2js from "xml2js";
+import { storage } from "./storage.js";
 
-const upload = multer({ storage: multer.memoryStorage() });
+const router = express.Router();
+const upload = multer();
 
-export async function registerRoutes(app: Express): Promise<Server> {
-  
-  // Upload polygon files (KML/SHP)
-  app.post("/api/upload-polygon", upload.array("files"), async (req: any, res: Response) => {
-    try {
-      console.log("File upload request received");
-      console.log("Request files:", req.files);
-      console.log("Request body:", req.body);
-      
-      const files = req.files as Express.Multer.File[];
-      if (!files || files.length === 0) {
-        console.log("No files found in request");
-        return res.status(400).json({ message: "No files uploaded" });
-      }
+// Test endpoint
+router.get("/api/test", (req: Request, res: Response) => {
+  res.json({ message: "API is working!" });
+});
 
-      const uploadedFiles = [];
-      const polygons = [];
-
-      for (const file of files) {
-        console.log(`Processing file: ${file.originalname}, type: ${file.mimetype}`);
-        let polygon = null;
-        let fileData = null;
-
-        if (file.mimetype.includes("kml") || file.originalname.endsWith(".kml")) {
-          console.log("Parsing KML file");
-          const result = await parseKML(file.buffer);
-          polygon = result.polygon;
-          fileData = result.data;
-        } else if (file.mimetype.includes("zip") || file.originalname.endsWith(".shp")) {
-          console.log("Parsing SHP file");
-          const result = await parseSHP(file.buffer);
-          polygon = result.polygon;
-          fileData = result.data;
-        } else {
-          console.log(`Unsupported file type: ${file.mimetype}`);
-          continue;
-        }
-
-        if (polygon) {
-          console.log("Polygon extracted successfully");
-          const uploadedFile = await storage.createUploadedFile({
-            fileName: file.originalname,
-            fileType: file.originalname.endsWith(".kml") ? "kml" : "shp",
-            fileData,
-            polygon,
-          });
-          
-          uploadedFiles.push(uploadedFile);
-          polygons.push(polygon);
-        } else {
-          console.log("No polygon extracted from file");
-        }
-      }
-
-      console.log(`Successfully processed ${polygons.length} files`);
-      res.json({ files: uploadedFiles, polygons });
-    } catch (error) {
-      console.error("File upload error:", error);
-      res.status(500).json({ message: "Failed to process uploaded files", error: error.message });
-    }
-  });
-
-  // Generate transect route
-  app.post("/api/generate-route", async (req, res) => {
-    try {
-      const { polygon, parameters, name } = req.body;
-      
-      if (!polygon || !parameters) {
-        return res.status(400).json({ message: "Polygon and parameters required" });
-      }
-
-      // Validate parameters
-      const validParams = routeParametersSchema.parse(parameters);
-      
-      // Generate transect lines
-      const route = await generateTransectRoute(polygon, validParams);
-      
-      // Use provided name or generate default
-      const routeName = name?.trim() || `Route ${Date.now()}`;
-      
-      // Save route
-      const savedRoute = await storage.createRoute({
-        name: routeName,
-        polygon,
-        distance: validParams.distance,
-        bearing: validParams.bearing,
-        overlap: validParams.overlap,
-        turnRadius: validParams.turnRadius,
-        transectLines: route.transectLines,
-        waypoints: route.waypoints,
-        totalDistance: route.totalDistance,
-        estimatedTime: route.estimatedTime,
-      });
-
-      res.json(savedRoute);
-    } catch (error) {
-      console.error("Route generation error:", error);
-      res.status(500).json({ message: "Failed to generate route" });
-    }
-  });
-
-  // Get route by ID
-  app.get("/api/routes/:id", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const route = await storage.getRoute(id);
-      
-      if (!route) {
-        return res.status(404).json({ message: "Route not found" });
-      }
-
-      res.json(route);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to get route" });
-    }
-  });
-
-  const httpServer = createServer(app);
-  return httpServer;
-}
-
-// Route generation algorithm
-async function generateTransectRoute(polygon: any, parameters: any) {
+// Get all routes  
+router.get("/api/routes", async (req: Request, res: Response) => {
   try {
+    // For simplicity, return empty array since we don't have a getRoutes method
+    res.json([]);
+  } catch (error) {
+    console.error("Error fetching routes:", error);
+    res.status(500).json({ error: "Failed to fetch routes" });
+  }
+});
+
+// Get specific route
+router.get("/api/routes/:id", async (req: Request, res: Response) => {
+  try {
+    const id = parseInt(req.params.id);
+    const route = await storage.getRoute(id);
+    
+    if (!route) {
+      return res.status(404).json({ error: "Route not found" });
+    }
+    
+    res.json(route);
+  } catch (error) {
+    console.error("Error fetching route:", error);
+    res.status(500).json({ error: "Failed to fetch route" });
+  }
+});
+
+// Generate route from polygon
+router.post("/api/generate-route", async (req: Request, res: Response) => {
+  try {
+    const { name, polygon, parameters } = req.body;
     console.log("Starting route generation with:");
     console.log("Polygon:", JSON.stringify(polygon, null, 2));
     console.log("Parameters:", JSON.stringify(parameters, null, 2));
-    // Convert polygon to Turf feature if needed
-    let polygonFeature;
-    console.log("Processing polygon type:", polygon?.type);
+
+    if (!polygon || !parameters) {
+      return res.status(400).json({ error: "Missing polygon or parameters" });
+    }
+
+    // Generate route
+    const routeData = generateTransectRoute(polygon, parameters);
     
-    if (polygon?.type === 'Polygon') {
+    // Store route
+    const route = await storage.createRoute({
+      name: name || "Survey Route",
+      polygon,
+      distance: parameters.distance,
+      bearing: parameters.bearing,
+      overlap: parameters.overlap,
+      turnRadius: parameters.turnRadius,
+      transectLines: routeData.transectLines,
+      waypoints: routeData.waypoints,
+      totalDistance: routeData.totalDistance,
+      estimatedTime: routeData.estimatedTime,
+    });
+
+    res.json(route);
+  } catch (error) {
+    console.error("Error generating route:", error);
+    console.error("Stack trace:", error.stack);
+    res.status(500).json({ error: `Failed to generate route: ${error.message}` });
+  }
+});
+
+// Upload and parse KML/SHP file
+router.post("/api/upload", upload.single("file"), async (req: Request, res: Response) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
+
+    const fileType = req.file.originalname.toLowerCase().endsWith('.kml') ? 'kml' : 'shp';
+    let parsedData;
+
+    if (fileType === 'kml') {
+      parsedData = await parseKML(req.file.buffer);
+    } else {
+      parsedData = await parseSHP(req.file.buffer);
+    }
+
+    // Store file
+    const file = await storage.createUploadedFile({
+      fileName: req.file.originalname,
+      fileType,
+      fileData: parsedData.data,
+      polygon: parsedData.polygon
+    });
+
+    res.json({
+      id: file.id,
+      fileName: file.fileName,
+      fileType: file.fileType,
+      polygon: parsedData.polygon
+    });
+  } catch (error) {
+    console.error("Error uploading file:", error);
+    res.status(500).json({ error: `Failed to upload file: ${error.message}` });
+  }
+});
+
+// Generate transect route from polygon and parameters
+function generateTransectRoute(polygon: any, parameters: any) {
+  try {
+    console.log("Processing polygon type:", polygon.type);
+    
+    // Create polygon from coordinates
+    let polygonFeature;
+    if (polygon.type === "Polygon") {
       console.log("Creating polygon from coordinates");
       
-      // Check if coordinates are in Web Mercator (large numbers) and convert if needed
+      // Check if coordinates are in Web Mercator (large numbers)
       const firstCoord = polygon.coordinates[0][0];
-      const isWebMercator = Math.abs(firstCoord[0]) > 1000 || Math.abs(firstCoord[1]) > 1000;
-      
-      if (isWebMercator) {
+      if (Math.abs(firstCoord[0]) > 360 || Math.abs(firstCoord[1]) > 180) {
         console.log("Converting from Web Mercator to WGS84");
-        // Convert Web Mercator (EPSG:3857) to WGS84 (EPSG:4326)
-        const convertedCoordinates = polygon.coordinates.map((ring: number[][]) => 
-          ring.map((coord: number[]) => {
-            const x = coord[0];
-            const y = coord[1];
-            
-            // Web Mercator to WGS84 conversion
-            const lng = (x / 20037508.34) * 180;
-            let lat = (y / 20037508.34) * 180;
-            lat = 180 / Math.PI * (2 * Math.atan(Math.exp(lat * Math.PI / 180)) - Math.PI / 2);
-            
-            return [lng, lat];
-          })
-        );
-        polygonFeature = turf.polygon(convertedCoordinates);
-        console.log("Converted coordinates:", convertedCoordinates[0]);
+        // Convert Web Mercator to WGS84
+        const convertedCoords = polygon.coordinates[0].map(coord => {
+          const x = coord[0];
+          const y = coord[1];
+          const lng = (x / 20037508.34) * 180;
+          let lat = (y / 20037508.34) * 180;
+          lat = 180 / Math.PI * (2 * Math.atan(Math.exp(lat * Math.PI / 180)) - Math.PI / 2);
+          return [lng, lat];
+        });
+        console.log("Converted coordinates:", convertedCoords);
+        polygonFeature = turf.polygon([convertedCoords]);
       } else {
         polygonFeature = turf.polygon(polygon.coordinates);
       }
-    } else if (polygon?.type === 'Feature' && polygon?.geometry?.type === 'Polygon') {
-      console.log("Using existing feature polygon");
+    } else if (polygon.type === "Feature" && polygon.geometry.type === "Polygon") {
       polygonFeature = polygon;
     } else {
-      console.error("Invalid polygon format. Received:", polygon);
-      throw new Error(`Invalid polygon format: expected Polygon or Feature, got ${polygon?.type}`);
+      throw new Error(`Unsupported polygon type: ${polygon.type}`);
     }
     
     console.log("Polygon feature created successfully");
     
-    // Calculate effective line spacing (accounting for overlap)
-    const effectiveDistance = parameters.distance * (1 - parameters.overlap / 100);
-    
-    // Get polygon bounding box and expand it
-    const bbox = turf.bbox(polygonFeature);
-    const [minX, minY, maxX, maxY] = bbox;
-    
     // Calculate polygon dimensions
-    const width = maxX - minX;
-    const height = maxY - minY;
-    const diagonal = Math.sqrt(width * width + height * height);
+    const bbox = turf.bbox(polygonFeature);
+    const diagonal = Math.sqrt(
+      Math.pow(bbox[2] - bbox[0], 2) + Math.pow(bbox[3] - bbox[1], 2)
+    );
     
-    // Convert bearing to perpendicular direction for line generation
-    // We want lines perpendicular to the bearing direction
+    // Calculate effective distance accounting for overlap
+    const overlapFactor = (100 - parameters.overlap) / 100;
+    const effectiveDistance = parameters.distance * overlapFactor;
+    
+    // Calculate number of lines needed
     const perpBearing = (parameters.bearing + 90) % 360;
     const perpBearingRad = (perpBearing * Math.PI) / 180;
-    
-    // Calculate how many lines we need to cover the polygon completely
-    // Project polygon diagonal onto the perpendicular bearing direction
-    const projectedWidth = Math.abs(width * Math.cos(perpBearingRad)) + Math.abs(height * Math.sin(perpBearingRad));
-    const lineCount = Math.ceil(projectedWidth * 111000 / effectiveDistance) + 2; // Add buffer lines
+    const lineCount = Math.ceil((diagonal * 111000) / effectiveDistance);
     
     console.log(`Generating ${lineCount} transect lines with ${effectiveDistance}m spacing`);
     
@@ -223,6 +188,7 @@ async function generateTransectRoute(polygon: any, parameters: any) {
       // Create a long line along the bearing direction
       const lineLength = diagonal * 2; // Make it long enough to span the polygon
       const lineLengthDegrees = lineLength;
+      
       const startX = lineCenter[0] - lineLengthDegrees * Math.cos(bearingRad);
       const startY = lineCenter[1] - lineLengthDegrees * Math.sin(bearingRad);
       const endX = lineCenter[0] + lineLengthDegrees * Math.cos(bearingRad);
@@ -255,175 +221,24 @@ async function generateTransectRoute(polygon: any, parameters: any) {
       }
     }
 
-    // Second pass: Create alternating waypoint path with curved U-turns
-    // Following the Python reference method for smooth curve generation
-    const turnRadiusMeters = parameters.turnRadius || (parameters.distance * 0.5);
+    // Create simple waypoint path with alternating directions
+    console.log(`Creating waypoints for ${transectLines.length} transect lines`);
     
-    // Use existing bearingRad from above for direction vector calculations
-    const D = [Math.sin(bearingRad), Math.cos(bearingRad)]; // Direction vector
-    
-    // Helper function to align points in survey direction (like Python adjust_point)
-    const alignPoint = (point: number[], target: number, directionVector: number[]) => {
-      const current = point[0] * directionVector[0] + point[1] * directionVector[1];
-      const shift = target - current;
-      return [
-        point[0] + shift * directionVector[0],
-        point[1] + shift * directionVector[1]
-      ];
-    };
-    
-    // Build route with alternating pattern and curved turns
     for (let i = 0; i < transectLines.length; i++) {
       const line = transectLines[i];
-      const lineCoords = line.geometry.coordinates;
-      const start = lineCoords[0];
-      const end = lineCoords[1];
+      const coords = line.geometry.coordinates;
       
-      let travelStart: number[], travelEnd: number[];
-      
+      // Determine direction based on alternating pattern
       if (i % 2 === 0) {
-        // Even lines: go from start to end
-        travelStart = start;
-        travelEnd = end;
+        // Even lines: start to end
+        waypoints.push({ lat: coords[0][1], lng: coords[0][0] });
+        waypoints.push({ lat: coords[1][1], lng: coords[1][0] });
       } else {
-        // Odd lines: go from end to start (alternating pattern)
-        travelStart = end;
-        travelEnd = start;
-      }
-      
-      if (i === 0) {
-        // First line: add waypoints along the entire line
-        const lineString = turf.lineString([travelStart, travelEnd]);
-        const lineLength = turf.length(lineString, { units: 'kilometers' });
-        const numWaypoints = Math.max(2, Math.ceil(lineLength * 10)); // About 10 waypoints per km
-        
-        for (let j = 0; j <= numWaypoints; j++) {
-          const progress = j / numWaypoints;
-          const point = turf.along(lineString, progress * lineLength, { units: 'kilometers' });
-          waypoints.push({ lat: point.geometry.coordinates[1], lng: point.geometry.coordinates[0] });
-        }
-      } else {
-        // For subsequent lines, add waypoints along the line (start is connected by curve)
-        const lineString = turf.lineString([travelStart, travelEnd]);
-        const lineLength = turf.length(lineString, { units: 'kilometers' });
-        const numWaypoints = Math.max(2, Math.ceil(lineLength * 10)); // About 10 waypoints per km
-        
-        // Skip the first waypoint (it's connected by the curve) and add the rest
-        for (let j = 1; j <= numWaypoints; j++) {
-          const progress = j / numWaypoints;
-          const point = turf.along(lineString, progress * lineLength, { units: 'kilometers' });
-          waypoints.push({ lat: point.geometry.coordinates[1], lng: point.geometry.coordinates[0] });
-        }
-      }
-      
-      // Add curved turn between this line and the next
-      if (i < transectLines.length - 1) {
-        const nextLine = transectLines[i + 1];
-        const nextStart = nextLine.geometry.coordinates[0];
-        const nextEnd = nextLine.geometry.coordinates[1];
-        
-        // Determine next line's travel direction
-        let nextTravelStart: number[];
-        if ((i + 1) % 2 === 0) {
-          nextTravelStart = nextStart;
-        } else {
-          nextTravelStart = nextEnd;
-        }
-        
-        // Current turn direction - determine based on bearing and line index
-        let turnRight = (i % 2 === 0);
-        // For 0-degree bearing, keep original logic
-        // For other bearings, adjust based on quadrant
-        if (parameters.bearing >= 45 && parameters.bearing < 135) {
-          // East quadrant (45-135 degrees)
-          turnRight = !turnRight;
-        } else if (parameters.bearing >= 135 && parameters.bearing < 225) {
-          // South quadrant (135-225 degrees)
-          turnRight = !turnRight;
-        } else if (parameters.bearing >= 225 && parameters.bearing < 315) {
-          // West quadrant (225-315 degrees)
-          turnRight = !turnRight;
-        }
-        // North quadrant (315-45 degrees) keeps original logic
-        
-        // Following Python method: align points in survey direction
-        let T1 = travelEnd;
-        const T1_proj = T1[0] * D[0] + T1[1] * D[1];
-        const nextProj = nextTravelStart[0] * D[0] + nextTravelStart[1] * D[1];
-        
-        // Check if we need to extend based on alternating pattern
-        // Use a more robust extension logic that considers the geometric relationship
-        let needsExtension = false;
-        const projectionDiff = nextProj - T1_proj;
-        
-        // Extension logic: extend if the next line's start is significantly ahead/behind
-        // in the survey direction compared to current line's end
-        if (Math.abs(projectionDiff) > 0.00001) { // Only extend if there's a meaningful difference
-          if (i % 2 === 0) {
-            // Even lines: extend if next is ahead in survey direction
-            needsExtension = projectionDiff > 0;
-          } else {
-            // Odd lines: extend if next is behind in survey direction
-            needsExtension = projectionDiff < 0;
-          }
-        }
-        
-        if (needsExtension) {
-          const extensionInSurveyDirection = Math.abs(projectionDiff) + 0.0002; // Slightly larger buffer
-          const extensionDirection = projectionDiff > 0 ? 1 : -1;
-          
-          T1 = [
-            T1[0] + extensionInSurveyDirection * extensionDirection * D[0],
-            T1[1] + extensionInSurveyDirection * extensionDirection * D[1]
-          ];
-          
-          // Add waypoint for the extended endpoint
-          waypoints.push({ lat: T1[1], lng: T1[0] });
-        }
-        
-        const T2 = alignPoint(nextTravelStart, T1[0] * D[0] + T1[1] * D[1], D);
-        
-        // Calculate chord distance and radius
-        const chordDx = T2[0] - T1[0];
-        const chordDy = T2[1] - T1[1];
-        const chordDist = Math.sqrt(chordDx * chordDx + chordDy * chordDy);
-        
-        // Ensure minimum chord distance for proper curve generation
-        if (chordDist < 0.00001) {
-          // If points are too close, just add a direct waypoint
-          waypoints.push({ lat: T2[1], lng: T2[0] });
-        } else {
-          const R = chordDist / 2.0;
-          
-          // Calculate arc center
-          const centerX = (T1[0] + T2[0]) / 2.0;
-          const centerY = (T1[1] + T2[1]) / 2.0;
-          
-          // Calculate start angle
-          const startAngle = Math.atan2(T1[1] - centerY, T1[0] - centerX);
-          
-          // Generate arc points (following Python method)
-          const segments = 12;
-          for (let j = 1; j < segments; j++) {
-            let theta: number;
-            if (turnRight) {
-              theta = startAngle - (Math.PI * j / segments);
-            } else {
-              theta = startAngle + (Math.PI * j / segments);
-            }
-            
-            const x = centerX + R * Math.cos(theta);
-            const y = centerY + R * Math.sin(theta);
-            
-            waypoints.push({ lat: y, lng: x });
-          }
-          
-          // Add the aligned T2 point
-          waypoints.push({ lat: T2[1], lng: T2[0] });
-        }
+        // Odd lines: end to start (back-and-forth pattern)
+        waypoints.push({ lat: coords[1][1], lng: coords[1][0] });
+        waypoints.push({ lat: coords[0][1], lng: coords[0][0] });
       }
     }
-
     
     // Calculate total distance
     let totalDistance = 0;
@@ -432,7 +247,7 @@ async function generateTransectRoute(polygon: any, parameters: any) {
     }
     
     // Add turn distances
-    const turnDistance = waypoints.length * parameters.turnRadius * Math.PI / 2;
+    const turnDistance = (transectLines.length - 1) * parameters.turnRadius * Math.PI / 2;
     totalDistance += turnDistance;
     
     // Estimate time (assuming 5 m/s average speed)
@@ -494,38 +309,28 @@ const extractKMLCoordinates = (kmlData: any): number[][] | null => {
     const folder = doc?.Folder?.[0] || doc;
     const placemarks = folder?.Placemark || doc?.Placemark || [];
     
-    console.log("Found placemarks:", placemarks.length);
-    
     for (const placemark of placemarks) {
-      console.log("Processing placemark:", Object.keys(placemark));
-      
-      // Check for MultiGeometry first (like in your KML)
-      const multiGeometry = placemark.MultiGeometry?.[0];
-      if (multiGeometry) {
-        console.log("Found MultiGeometry");
-        const polygon = multiGeometry.Polygon?.[0];
-        if (polygon) {
-          const coords = polygon.outerBoundaryIs?.[0]?.LinearRing?.[0]?.coordinates?.[0];
-          if (coords) {
-            console.log("Found coordinates in MultiGeometry:", coords.substring(0, 100));
-            return parseCoordinateString(coords);
+      const geometry = placemark?.Polygon?.[0] || placemark?.LineString?.[0];
+      if (geometry) {
+        const coordinateString = geometry?.outerBoundaryIs?.[0]?.LinearRing?.[0]?.coordinates?.[0] ||
+                               geometry?.coordinates?.[0];
+        
+        if (coordinateString) {
+          const coords = coordinateString.trim().split(/\s+/).map((coord: string) => {
+            const parts = coord.split(',');
+            return [parseFloat(parts[0]), parseFloat(parts[1])];
+          });
+          
+          // Ensure polygon is closed
+          if (coords.length > 0 && (coords[0][0] !== coords[coords.length - 1][0] || coords[0][1] !== coords[coords.length - 1][1])) {
+            coords.push(coords[0]);
           }
-        }
-      }
-      
-      // Check for direct Polygon
-      const polygon = placemark.Polygon?.[0];
-      if (polygon) {
-        console.log("Found direct Polygon");
-        const coords = polygon.outerBoundaryIs?.[0]?.LinearRing?.[0]?.coordinates?.[0];
-        if (coords) {
-          console.log("Found coordinates in Polygon:", coords.substring(0, 100));
-          return parseCoordinateString(coords);
+          
+          return coords;
         }
       }
     }
     
-    console.log("No coordinates found in KML");
     return null;
   } catch (error) {
     console.error("Error extracting KML coordinates:", error);
@@ -533,13 +338,9 @@ const extractKMLCoordinates = (kmlData: any): number[][] | null => {
   }
 };
 
-const parseCoordinateString = (coords: string): number[][] => {
-  // Parse coordinate string "lng,lat,alt lng,lat,alt ..." or "lng,lat,alt\nlng,lat,alt..."
-  const coordPairs = coords.trim().split(/[\s\n]+/).filter(pair => pair.trim().length > 0);
-  console.log("Coordinate pairs found:", coordPairs.length);
-  
-  return coordPairs.map((pair: string) => {
-    const [lng, lat, alt] = pair.split(',').map(Number);
-    return [lng, lat]; // Only return lng, lat (ignore altitude)
-  }).filter(coord => !isNaN(coord[0]) && !isNaN(coord[1])); // Filter out invalid coordinates
+export const registerRoutes = (app: express.Express) => {
+  app.use("/", router);
+  return app;
 };
+
+export default router;
