@@ -286,15 +286,15 @@ export default function MapContainer({
               offset += featureSet.features.length;
               console.log(`Fetched ${featureSet.features.length} features, total: ${allFeatures.length}`);
               
-              // Check if we've reached the end based on exceededTransferLimit or fewer features than requested
-              if (!featureSet.exceededTransferLimit || featureSet.features.length < maxRecordCount) {
+              // Stop when we have all features or reach the known total
+              if (allFeatures.length >= featureCount || featureSet.features.length < maxRecordCount) {
                 hasMoreFeatures = false;
-                console.log("Reached end of features");
+                console.log(`Reached end of features: ${allFeatures.length}/${featureCount}`);
               }
               
               // Safety check to prevent infinite loops
-              if (allFeatures.length > 50000) {
-                console.warn("Safety limit reached, stopping pagination");
+              if (allFeatures.length > featureCount + 1000) {
+                console.warn("Safety limit exceeded, stopping pagination");
                 hasMoreFeatures = false;
               }
             }
