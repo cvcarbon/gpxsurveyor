@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Trash2, Menu } from "lucide-react";
+import { Trash2, Menu, Edit3 } from "lucide-react";
 
 interface BasicMapProps {
   polygon: any;
@@ -21,6 +21,9 @@ export default function BasicMap({
   const mapRef = useRef<HTMLDivElement>(null);
   const [mapReady, setMapReady] = useState(false);
   const [error, setError] = useState<string>("");
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [sketch, setSketch] = useState<any>(null);
+  const [mapView, setMapView] = useState<any>(null);
 
   useEffect(() => {
     let view: any = null;
@@ -34,10 +37,12 @@ export default function BasicMap({
           throw new Error('Esri API not loaded');
         }
 
-        const [Map, MapView] = await new Promise((resolve, reject) => {
+        const [Map, MapView, Sketch, GraphicsLayer] = await new Promise((resolve, reject) => {
           (window as any).require([
             "esri/Map",
-            "esri/views/MapView"
+            "esri/views/MapView",
+            "esri/widgets/Sketch",
+            "esri/layers/GraphicsLayer"
           ], (...modules: any[]) => {
             resolve(modules);
           }, (error: any) => {
@@ -45,8 +50,12 @@ export default function BasicMap({
           });
         });
 
+        // Create graphics layer for drawing
+        const graphicsLayer = new (GraphicsLayer as any)();
+        
         const map = new (Map as any)({
-          basemap: "streets-navigation-vector"
+          basemap: "satellite",
+          layers: [graphicsLayer]
         });
 
         view = new (MapView as any)({
@@ -56,8 +65,54 @@ export default function BasicMap({
           zoom: 11
         });
 
+        // Create sketch widget
+        const sketchWidget = new (Sketch as any)({
+          layer: graphicsLayer,
+          view: view,
+          creationMode: "single",
+          availableCreateTools: ["polygon"],
+          visibleElements: {
+            createTools: {
+              point: false,
+              polyline: false,
+              rectangle: false,
+              circle: false
+            },
+            selectionTools: {
+              "rectangle-selection": false,
+              "lasso-selection": false
+            },
+            settingsMenu: false,
+            undoRedoMenu: false
+          }
+        });
+
+        // Handle sketch events
+        sketchWidget.on("create", (event: any) => {
+          if (event.state === "complete") {
+            const geometry = event.graphic.geometry;
+            if (geometry && geometry.type === "polygon" && geometry.rings && geometry.rings.length > 0) {
+              const coordinates = geometry.rings[0].map((ring: number[]) => [ring[0], ring[1]]);
+              // Ensure polygon is closed
+              if (coordinates[0][0] !== coordinates[coordinates.length - 1][0] || 
+                  coordinates[0][1] !== coordinates[coordinates.length - 1][1]) {
+                coordinates.push([coordinates[0][0], coordinates[0][1]]);
+              }
+              const geoJsonPolygon = {
+                type: "Polygon",
+                coordinates: [coordinates]
+              };
+              onPolygonChange(geoJsonPolygon);
+              setIsDrawing(false);
+              view.ui.remove(sketchWidget);
+            }
+          }
+        });
+
         await view.when();
         console.log("Basic map initialized successfully");
+        setMapView(view);
+        setSketch(sketchWidget);
         setMapReady(true);
         setError("");
 
@@ -84,7 +139,48 @@ export default function BasicMap({
   }, []);
 
   const handleClear = () => {
+    if (sketch && mapView) {
+      try {
+        sketch.cancel();
+        mapView.ui.remove(sketch);
+      } catch (e) {
+        // Ignore errors
+      }
+      setIsDrawing(false);
+    }
     onPolygonChange(null);
+  };
+
+  const handleDrawPolygon = () => {
+    if (!sketch || !mapView) return;
+    
+    if (isDrawing) {
+      // Cancel drawing
+      try {
+        sketch.cancel();
+        mapView.ui.remove(sketch);
+      } catch (e) {
+        // Ignore errors
+      }
+      setIsDrawing(false);
+    } else {
+      // Start drawing
+      const graphicsLayer = mapView.map.layers.getItemAt(0);
+      if (graphicsLayer) {
+        graphicsLayer.removeAll();
+      }
+      
+      mapView.ui.add(sketch, "top-right");
+      setIsDrawing(true);
+      
+      setTimeout(() => {
+        try {
+          sketch.create("polygon");
+        } catch (e) {
+          console.warn("Could not start polygon creation:", e);
+        }
+      }, 100);
+    }
   };
 
   return (
@@ -142,12 +238,22 @@ export default function BasicMap({
       {/* Controls */}
       {mapReady && (
         <div className="absolute top-4 right-4 z-10">
-          <Card className="p-2">
+          <Card className="p-2 space-y-2">
+            <Button
+              variant={isDrawing ? "default" : "outline"}
+              size="sm"
+              onClick={handleDrawPolygon}
+              className="w-full"
+            >
+              <Edit3 className="h-4 w-4 mr-2" />
+              {isDrawing ? "Cancel Draw" : "Draw Polygon"}
+            </Button>
+            
             <Button
               variant="outline"
               size="sm"
               onClick={handleClear}
-              className="text-red-600 hover:text-red-700"
+              className="w-full text-red-600 hover:text-red-700"
             >
               <Trash2 className="h-4 w-4 mr-2" />
               Clear
@@ -165,6 +271,11 @@ export default function BasicMap({
           {polygon && (
             <div className="text-xs text-gray-600 mt-1">
               Polygon loaded
+            </div>
+          )}
+          {isDrawing && (
+            <div className="text-xs text-blue-600 mt-1">
+              Click to draw polygon points
             </div>
           )}
         </Card>
