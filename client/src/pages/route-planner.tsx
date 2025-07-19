@@ -6,7 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { RouteParameters } from "@shared/schema";
 
 export default function RoutePlanner() {
-  const [sidebarOpen, setSidebarOpen] = useState(false); // Start closed on mobile
+  const [sidebarOpen, setSidebarOpen] = useState(true); // Start open, will be responsive
   const [polygon, setPolygon] = useState<any>(null);
   const [routeParameters, setRouteParameters] = useState<RouteParameters>({
     distance: 50,
@@ -21,6 +21,25 @@ export default function RoutePlanner() {
     "https://services.arcgis.com/W1AXaDPef2QMa9kU/arcgis/rest/services/Bedding_Documentation_view/FeatureServer/0": true
   });
   const { toast } = useToast();
+
+  // Handle responsive sidebar behavior
+  useEffect(() => {
+    const handleResize = () => {
+      const isMobile = window.innerWidth < 768; // md breakpoint
+      if (isMobile) {
+        setSidebarOpen(false); // Close on mobile
+      } else {
+        setSidebarOpen(true); // Open on desktop
+      }
+    };
+
+    // Set initial state
+    handleResize();
+    
+    // Listen for window resize
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const handlePolygonChange = (newPolygon: any) => {
     setPolygon(newPolygon);
