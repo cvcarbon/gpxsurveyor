@@ -148,15 +148,12 @@ export default function MapContainer({
           const showAuthPrompt = () => {
             if (!authPromptShown) {
               authPromptShown = true;
-              // Check for OAuth client ID in environment or prompt user
-              let clientId = import.meta.env.VITE_ARCGIS_CLIENT_ID;
+              // Check for OAuth client ID in environment or local storage
+              let clientId = import.meta.env.VITE_ARCGIS_CLIENT_ID || localStorage.getItem('arcgis_client_id');
               
               if (!clientId) {
-                clientId = prompt("Please enter your ArcGIS OAuth App ID (from your ArcGIS Developer account):");
-                if (!clientId) {
-                  console.log("No OAuth App ID provided, skipping authentication");
-                  return;
-                }
+                console.log("No OAuth App ID configured. Please set it in Map Settings.");
+                return;
               }
               
               const userConfirm = confirm("These map layers require ArcGIS authentication. Click OK to sign in, then you'll be redirected back here.");
