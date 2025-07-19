@@ -385,21 +385,19 @@ export default function BasicMap({
         </div>
       )}
 
-      {/* Sidebar Toggle */}
-      {!sidebarOpen && onToggleSidebar && (
-        <div className="absolute top-4 left-4 z-10">
-          <Button
-            onClick={onToggleSidebar}
-            variant="default"
-            size="icon"
-            className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg"
-          >
-            <Menu className="h-5 w-5" />
-          </Button>
-        </div>
-      )}
+      {/* Mobile-friendly Sidebar Toggle */}
+      <div className="absolute top-4 left-4 z-20">
+        <Button
+          onClick={onToggleSidebar}
+          variant="default"
+          size="icon"
+          className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg touch-manipulation min-h-[44px] min-w-[44px]"
+        >
+          <Menu className="h-5 w-5" />
+        </Button>
+      </div>
 
-      {/* Controls */}
+      {/* Mobile-optimized Controls */}
       {mapReady && (
         <div className="absolute top-4 right-4 z-10">
           <Card className="p-2 space-y-2">
@@ -407,19 +405,20 @@ export default function BasicMap({
               variant={isDrawing ? "default" : "outline"}
               size="sm"
               onClick={handleDrawPolygon}
-              className="w-full"
+              className="w-full touch-manipulation min-h-[36px] text-xs sm:text-sm"
             >
-              <Edit3 className="h-4 w-4 mr-2" />
-              {isDrawing ? "Cancel Draw" : "Draw Polygon"}
+              <Edit3 className="h-4 w-4 mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">{isDrawing ? "Cancel Draw" : "Draw Polygon"}</span>
+              <span className="sm:hidden">{isDrawing ? "Cancel" : "Draw"}</span>
             </Button>
             
             <Button
               variant="outline"
               size="sm"
               onClick={handleClear}
-              className="w-full text-red-600 hover:text-red-700"
+              className="w-full text-red-600 hover:text-red-700 touch-manipulation min-h-[36px] text-xs sm:text-sm"
             >
-              <Trash2 className="h-4 w-4 mr-2" />
+              <Trash2 className="h-4 w-4 mr-1 sm:mr-2" />
               Clear
             </Button>
             
@@ -428,25 +427,26 @@ export default function BasicMap({
                 variant={showWaypoints ? "default" : "outline"}
                 size="sm"
                 onClick={() => setShowWaypoints(!showWaypoints)}
-                className="w-full"
+                className="w-full touch-manipulation min-h-[36px] text-xs sm:text-sm"
               >
-                <Eye className="h-4 w-4 mr-2" />
-                {showWaypoints ? "Hide Points" : "Show Points"}
+                <Eye className="h-4 w-4 mr-1 sm:mr-2" />
+                <span className="hidden sm:inline">{showWaypoints ? "Hide Points" : "Show Points"}</span>
+                <span className="sm:hidden">{showWaypoints ? "Hide" : "Show"}</span>
               </Button>
             )}
           </Card>
         </div>
       )}
 
-      {/* Status */}
-      <div className="absolute bottom-4 left-4 z-10">
-        <Card className="p-3">
-          <div className="text-sm font-medium">
-            Status: {mapReady ? "Map Ready" : error ? "Error" : "Loading..."}
+      {/* Mobile-optimized Status */}
+      <div className="absolute bottom-4 left-4 z-10 max-w-[calc(100vw-2rem)] sm:max-w-none">
+        <Card className="p-2 sm:p-3">
+          <div className="text-xs sm:text-sm font-medium">
+            Status: {mapReady ? "Ready" : error ? "Error" : "Loading..."}
           </div>
           {generatedRoute && (
             <div className="text-xs text-gray-600 mt-1">
-              Route: {generatedRoute.transectLines?.length || 0} lines, {generatedRoute.waypoints?.length || 0} waypoints
+              {generatedRoute.transectLines?.length || 0} lines, {generatedRoute.waypoints?.length || 0} points
             </div>
           )}
           {polygon && !generatedRoute && (
@@ -456,7 +456,8 @@ export default function BasicMap({
           )}
           {isDrawing && (
             <div className="text-xs text-blue-600 mt-1">
-              Click to draw polygon points
+              <span className="hidden sm:inline">Click to draw polygon points</span>
+              <span className="sm:hidden">Tap to draw</span>
             </div>
           )}
         </Card>

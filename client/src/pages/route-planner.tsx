@@ -6,7 +6,20 @@ import { useToast } from "@/hooks/use-toast";
 import { RouteParameters } from "@shared/schema";
 
 export default function RoutePlanner() {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  // Start with sidebar closed on mobile, open on desktop
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  
+  // Set default sidebar state based on screen size
+  useEffect(() => {
+    const checkScreenSize = () => {
+      const isMobile = window.innerWidth < 768; // md breakpoint
+      setSidebarOpen(!isMobile);
+    };
+    
+    checkScreenSize();
+    window.addEventListener('resize', checkScreenSize);
+    return () => window.removeEventListener('resize', checkScreenSize);
+  }, []);
   const [polygon, setPolygon] = useState<any>(null);
   const [routeParameters, setRouteParameters] = useState<RouteParameters>({
     distance: 50,
@@ -52,18 +65,41 @@ export default function RoutePlanner() {
       </Helmet>
       
       <div className="flex h-screen overflow-hidden">
-        <Sidebar
-          open={sidebarOpen}
-          onToggle={() => setSidebarOpen(!sidebarOpen)}
-          polygon={polygon}
-          onPolygonChange={handlePolygonChange}
-          routeParameters={routeParameters}
-          onParametersChange={handleParametersChange}
-          generatedRoute={generatedRoute}
-          isGenerating={isGenerating}
-          onRouteGenerated={handleRouteGenerated}
-          onError={handleError}
-        />
+        {/* Mobile-responsive Sidebar */}
+        <div className={`
+          ${sidebarOpen 
+            ? 'fixed inset-0 z-50 md:relative md:inset-auto md:w-96' 
+            : 'hidden md:block md:w-0'
+          }
+          transition-all duration-300 overflow-hidden
+        `}>
+          {/* Mobile backdrop */}
+          {sidebarOpen && (
+            <div 
+              className="absolute inset-0 bg-black bg-opacity-50 md:hidden"
+              onClick={() => setSidebarOpen(false)}
+            />
+          )}
+          
+          <div className={`
+            relative z-10 h-full bg-white
+            ${sidebarOpen ? 'w-80 md:w-96' : 'w-0'}
+            transition-all duration-300
+          `}>
+            <Sidebar
+              open={sidebarOpen}
+              onToggle={() => setSidebarOpen(!sidebarOpen)}
+              polygon={polygon}
+              onPolygonChange={handlePolygonChange}
+              routeParameters={routeParameters}
+              onParametersChange={handleParametersChange}
+              generatedRoute={generatedRoute}
+              isGenerating={isGenerating}
+              onRouteGenerated={handleRouteGenerated}
+              onError={handleError}
+            />
+          </div>
+        </div>
         
         <div className="flex-1 relative">
           <BasicMap
