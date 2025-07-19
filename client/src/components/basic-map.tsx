@@ -24,6 +24,7 @@ export default function BasicMap({
   const [isDrawing, setIsDrawing] = useState(false);
   const [sketch, setSketch] = useState<any>(null);
   const [mapView, setMapView] = useState<any>(null);
+  const [routeLayer, setRouteLayer] = useState<any>(null);
 
   useEffect(() => {
     let view: any = null;
@@ -37,12 +38,15 @@ export default function BasicMap({
           throw new Error('Esri API not loaded');
         }
 
-        const [Map, MapView, Sketch, GraphicsLayer] = await new Promise((resolve, reject) => {
+        const [Map, MapView, Sketch, GraphicsLayer, Graphic, SimpleLineSymbol, SimpleMarkerSymbol] = await new Promise((resolve, reject) => {
           (window as any).require([
             "esri/Map",
             "esri/views/MapView",
             "esri/widgets/Sketch",
-            "esri/layers/GraphicsLayer"
+            "esri/layers/GraphicsLayer",
+            "esri/Graphic",
+            "esri/symbols/SimpleLineSymbol",
+            "esri/symbols/SimpleMarkerSymbol"
           ], (...modules: any[]) => {
             resolve(modules);
           }, (error: any) => {
@@ -50,12 +54,13 @@ export default function BasicMap({
           });
         });
 
-        // Create graphics layer for drawing
+        // Create graphics layers for drawing and routes
         const graphicsLayer = new (GraphicsLayer as any)();
+        const routeGraphicsLayer = new (GraphicsLayer as any)();
         
         const map = new (Map as any)({
           basemap: "satellite",
-          layers: [graphicsLayer]
+          layers: [graphicsLayer, routeGraphicsLayer]
         });
 
         view = new (MapView as any)({
@@ -113,6 +118,7 @@ export default function BasicMap({
         console.log("Basic map initialized successfully");
         setMapView(view);
         setSketch(sketchWidget);
+        setRouteLayer(routeGraphicsLayer);
         setMapReady(true);
         setError("");
 
@@ -138,6 +144,69 @@ export default function BasicMap({
     };
   }, []);
 
+  // Display generated route on map
+  useEffect(() => {
+    if (!mapView || !routeLayer || !generatedRoute) return;
+
+    (window as any).require([
+      "esri/Graphic",
+      "esri/geometry/Polyline", 
+      "esri/geometry/Point",
+      "esri/symbols/SimpleLineSymbol",
+      "esri/symbols/SimpleMarkerSymbol"
+    ], (Graphic: any, Polyline: any, Point: any, SimpleLineSymbol: any, SimpleMarkerSymbol: any) => {
+      // Clear existing route graphics
+      routeLayer.removeAll();
+
+      // Add transect lines
+      if (generatedRoute.transectLines) {
+        generatedRoute.transectLines.forEach((line: any, index: number) => {
+          const esriPolyline = new Polyline({
+            paths: [line.geometry.coordinates],
+            spatialReference: { wkid: 4326 }
+          });
+
+          const lineGraphic = new Graphic({
+            geometry: esriPolyline,
+            symbol: new SimpleLineSymbol({
+              color: index % 2 === 0 ? [255, 0, 0] : [0, 255, 0],
+              width: 3
+            })
+          });
+
+          routeLayer.add(lineGraphic);
+        });
+      }
+
+      // Add waypoints
+      if (generatedRoute.waypoints) {
+        generatedRoute.waypoints.forEach((waypoint: any) => {
+          const point = new Point({
+            longitude: waypoint.lng,
+            latitude: waypoint.lat,
+            spatialReference: { wkid: 4326 }
+          });
+
+          const waypointGraphic = new Graphic({
+            geometry: point,
+            symbol: new SimpleMarkerSymbol({
+              color: [255, 255, 0],
+              size: 4,
+              outline: {
+                color: [0, 0, 0],
+                width: 1
+              }
+            })
+          });
+
+          routeLayer.add(waypointGraphic);
+        });
+      }
+
+      console.log("Route displayed on map:", generatedRoute.transectLines?.length, "lines");
+    });
+  }, [generatedRoute, mapView, routeLayer]);
+
   const handleClear = () => {
     if (sketch && mapView) {
       try {
@@ -148,6 +217,12 @@ export default function BasicMap({
       }
       setIsDrawing(false);
     }
+    
+    // Clear route graphics
+    if (routeLayer) {
+      routeLayer.removeAll();
+    }
+    
     onPolygonChange(null);
   };
 
@@ -268,7 +343,12 @@ export default function BasicMap({
           <div className="text-sm font-medium">
             Status: {mapReady ? "Map Ready" : error ? "Error" : "Loading..."}
           </div>
-          {polygon && (
+          {generatedRoute && (
+            <div className="text-xs text-gray-600 mt-1">
+              Route: {generatedRoute.transectLines?.length || 0} lines, {generatedRoute.waypoints?.length || 0} waypoints
+            </div>
+          )}
+          {polygon && !generatedRoute && (
             <div className="text-xs text-gray-600 mt-1">
               Polygon loaded
             </div>
