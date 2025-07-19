@@ -43,8 +43,10 @@ export default function EsriMapContainer({
   useEffect(() => {
     if (!mapRef.current) return;
 
-    // Use the global require from ArcGIS API
-    window.require([
+    // Small delay to ensure DOM is ready
+    const initMap = () => {
+      // Use the global require from ArcGIS API
+      window.require([
       "esri/Map",
       "esri/views/MapView",
       "esri/widgets/Sketch",
@@ -86,8 +88,18 @@ export default function EsriMapContainer({
         center: [-94.7977, 29.3013], // Galveston Bay, TX
         zoom: 12,
         ui: {
-          components: ["attribution", "zoom"] // Remove default widgets
+          components: ["attribution"] // Remove default widgets except attribution
+        },
+        constraints: {
+          snapToZoom: false
         }
+      });
+
+      // Wait for view to load
+      mapView.when(() => {
+        console.log("Map view loaded successfully");
+      }).catch((error) => {
+        console.error("Map view failed to load:", error);
       });
 
       // Create sketch widget for drawing
@@ -166,9 +178,14 @@ export default function EsriMapContainer({
       (window as any).esriMapView = mapView;
       (window as any).esriMap = esriMap;
     });
+    };
+
+    // Initialize with small delay
+    const timer = setTimeout(initMap, 100);
 
     // Cleanup
     return () => {
+      clearTimeout(timer);
       if (view) {
         view.destroy();
       }
@@ -383,8 +400,13 @@ export default function EsriMapContainer({
       {/* Map Container */}
       <div
         ref={mapRef}
-        className="h-full w-full"
-        style={{ minHeight: "100vh" }}
+        className="h-full w-full esri-view-root"
+        style={{ 
+          minHeight: "100vh",
+          height: "100%",
+          width: "100%",
+          position: "relative"
+        }}
       />
 
       {/* Sidebar Toggle Button (shown when sidebar is closed) */}

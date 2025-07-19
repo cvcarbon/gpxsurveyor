@@ -116,4 +116,19 @@
     background: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(10px);
   }
+
+  /* Esri Map Styles */
+  .esri-view {
+    height: 100% !important;
+    width: 100% !important;
+  }
+
+  .esri-ui-top-right .esri-component {
+    margin: 0 0 10px 10px;
+  }
+
+  .esri-view .esri-view-surface {
+    height: 100% !important;
+    width: 100% !important;
+  }
 }
