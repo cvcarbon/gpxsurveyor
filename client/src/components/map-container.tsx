@@ -430,8 +430,13 @@ export default function MapContainer({
                   }
                 });
                 
+                console.log(`Created Leaflet layer with ${geoJsonLayer.getLayers().length} features`);
+                console.log("Layer bounds:", geoJsonLayer.getBounds());
+                
                 arcgisLayersRef.current[layerUrl] = geoJsonLayer;
                 geoJsonLayer.addTo(mapInstanceRef.current);
+                
+                console.log(`Layer successfully added to map. Total ArcGIS layers: ${Object.keys(arcgisLayersRef.current).length}`);
               } else {
                 console.error("No valid features found");
               }
