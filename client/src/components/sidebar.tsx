@@ -20,6 +20,7 @@ interface SidebarProps {
   isGenerating: boolean;
   onRouteGenerated: (route: any) => void;
   onError: (error: string) => void;
+  onStartDrawing?: () => void;
 }
 
 export default function Sidebar({
@@ -33,6 +34,7 @@ export default function Sidebar({
   isGenerating,
   onRouteGenerated,
   onError,
+  onStartDrawing,
 }: SidebarProps) {
   return (
     <div className={cn(
@@ -56,6 +58,7 @@ export default function Sidebar({
           polygon={polygon}
           onPolygonChange={onPolygonChange}
           onError={onError}
+          onStartDrawing={onStartDrawing}
         />
         
         <RouteParameters
