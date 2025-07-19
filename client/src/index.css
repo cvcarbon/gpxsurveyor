@@ -1,29 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-@import url('https://js.arcgis.com/4.28/esri/themes/light/main.css');
-
-/* Esri map container fix */
-.esri-view-root {
-  position: absolute !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  bottom: 0 !important;
-  width: 100% !important;
-  height: 100% !important;
-}
-
-.esri-view {
-  width: 100% !important;
-  height: 100% !important;
-}
-
-.esri-widget {
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3) !important;
-}
-
-.esri-sketch__panel {
-  background: rgba(255, 255, 255, 0.95) !important;
-}
+@import url('https://unpkg.com/leaflet@1.9.4/dist/leaflet.css');
+@import url('https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css');
 
 @tailwind base;
 @tailwind components;
