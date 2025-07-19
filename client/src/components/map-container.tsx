@@ -253,68 +253,45 @@ export default function MapContainer({
 
           await featureLayer.load();
           
-          // Get actual feature count first
-          const countQuery = featureLayer.createQuery();
-          countQuery.where = "1=1";
-          const totalCount = await featureLayer.queryFeatureCount(countQuery);
-          console.log(`Total features in layer: ${totalCount}`);
+          console.log("Using ObjectID-based pagination to avoid ArcGIS REST API pagination issues...");
           
-          // Use a Set to track unique feature IDs and avoid duplicates
-          const uniqueFeatures = new Map();
-          const batchSize = 2000;
-          let currentOffset = 0;
+          // First, get all ObjectIDs - this is reliable and doesn't have pagination issues
+          const idsQuery = featureLayer.createQuery();
+          idsQuery.where = "1=1";
+          idsQuery.returnIdsOnly = true;
           
-          console.log("Fetching all features with duplicate detection...");
+          const idsResult = await featureLayer.queryObjectIds(idsQuery);
+          const allObjectIds = idsResult;
+          console.log(`Got ${allObjectIds.length} ObjectIDs to fetch`);
           
-          // Calculate how many batches we need based on total count
-          const totalBatches = Math.ceil(totalCount / batchSize);
-          console.log(`Need ${totalBatches} batches to get all ${totalCount} features`);
+          // Now fetch features in batches using ObjectIDs
+          const allFeatures = [];
+          const batchSize = 1000; // Use smaller batches for ObjectID queries
           
-          for (let batch = 0; batch < totalBatches; batch++) {
+          for (let i = 0; i < allObjectIds.length; i += batchSize) {
+            const batchIds = allObjectIds.slice(i, i + batchSize);
+            const batchNumber = Math.floor(i / batchSize) + 1;
+            const totalBatches = Math.ceil(allObjectIds.length / batchSize);
+            
+            console.log(`Fetching batch ${batchNumber}/${totalBatches} (${batchIds.length} features)`);
+            
             const query = featureLayer.createQuery();
+            query.objectIds = batchIds;
             query.outFields = ["*"];
             query.returnGeometry = true;
-            query.resultOffset = currentOffset;
-            query.resultRecordCount = batchSize;
-            
-            console.log(`Fetching batch ${batch + 1}/${totalBatches} (offset: ${currentOffset})`);
             
             try {
               const featureSet = await featureLayer.queryFeatures(query);
               const batchFeatures = featureSet.features;
               
-              if (batchFeatures.length === 0) {
-                console.log("No more features returned, stopping");
-                break;
-              }
-              
-              // Add features to map, checking for duplicates
-              let newFeaturesCount = 0;
-              batchFeatures.forEach(feature => {
-                const featureId = feature.attributes.OBJECTID || feature.attributes.OBJECTID_1 || feature.uid;
-                if (!uniqueFeatures.has(featureId)) {
-                  uniqueFeatures.set(featureId, feature);
-                  newFeaturesCount++;
-                }
-              });
-              
-              currentOffset += batchFeatures.length;
-              console.log(`Batch ${batch + 1}: got ${batchFeatures.length} features, ${newFeaturesCount} new, total unique: ${uniqueFeatures.size}/${totalCount}`);
-              
-              // Stop if we have all unique features or if we're not getting new ones
-              if (uniqueFeatures.size >= totalCount || newFeaturesCount === 0) {
-                console.log("All unique features collected");
-                break;
-              }
+              allFeatures.push(...batchFeatures);
+              console.log(`Batch ${batchNumber}: got ${batchFeatures.length} features, total: ${allFeatures.length}/${allObjectIds.length}`);
               
             } catch (error) {
-              console.error(`Error fetching batch ${batch + 1}:`, error);
-              break;
+              console.error(`Error fetching batch ${batchNumber}:`, error);
+              // Continue with next batch instead of stopping
             }
           }
-          
-          // Convert map values back to array
-          const allFeatures = Array.from(uniqueFeatures.values());
           
           console.log(`Total features loaded: ${allFeatures.length}`);
           
