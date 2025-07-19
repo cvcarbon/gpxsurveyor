@@ -1,25 +1,12 @@
 import { useState, useEffect } from "react";
 import { Helmet } from "react-helmet";
 import Sidebar from "@/components/sidebar";
-import BasicMap from "@/components/basic-map";
+import MapContainer from "@/components/map-container";
 import { useToast } from "@/hooks/use-toast";
 import { RouteParameters } from "@shared/schema";
 
 export default function RoutePlanner() {
-  // Start with sidebar closed on mobile, open on desktop
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  
-  // Set default sidebar state based on screen size
-  useEffect(() => {
-    const checkScreenSize = () => {
-      const isMobile = window.innerWidth < 768; // md breakpoint
-      setSidebarOpen(!isMobile);
-    };
-    
-    checkScreenSize();
-    window.addEventListener('resize', checkScreenSize);
-    return () => window.removeEventListener('resize', checkScreenSize);
-  }, []);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [polygon, setPolygon] = useState<any>(null);
   const [routeParameters, setRouteParameters] = useState<RouteParameters>({
     distance: 50,
@@ -30,21 +17,6 @@ export default function RoutePlanner() {
   const [generatedRoute, setGeneratedRoute] = useState<any>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const { toast } = useToast();
-
-  // Manage body scroll lock on mobile when sidebar is open
-  useEffect(() => {
-    if (window.innerWidth < 768) {
-      if (sidebarOpen) {
-        document.body.classList.add('sidebar-open');
-      } else {
-        document.body.classList.remove('sidebar-open');
-      }
-    }
-
-    return () => {
-      document.body.classList.remove('sidebar-open');
-    };
-  }, [sidebarOpen]);
 
   const handlePolygonChange = (newPolygon: any) => {
     setPolygon(newPolygon);
@@ -80,38 +52,21 @@ export default function RoutePlanner() {
       </Helmet>
       
       <div className="flex h-screen overflow-hidden">
-        {/* Mobile backdrop */}
-        {sidebarOpen && (
-          <div 
-            className="fixed inset-0 bg-black bg-opacity-50 md:hidden z-40"
-            onClick={() => setSidebarOpen(false)}
-          />
-        )}
-        
-        {/* Sidebar Container */}
-        <div className={`
-          ${sidebarOpen 
-            ? 'fixed left-0 top-0 h-full w-80 z-50 md:relative md:w-96' 
-            : 'hidden md:block md:w-0'
-          }
-          transition-all duration-300 md:overflow-hidden
-        `}>
-          <Sidebar
-            open={sidebarOpen}
-            onToggle={() => setSidebarOpen(!sidebarOpen)}
-            polygon={polygon}
-            onPolygonChange={handlePolygonChange}
-            routeParameters={routeParameters}
-            onParametersChange={handleParametersChange}
-            generatedRoute={generatedRoute}
-            isGenerating={isGenerating}
-            onRouteGenerated={handleRouteGenerated}
-            onError={handleError}
-          />
-        </div>
+        <Sidebar
+          open={sidebarOpen}
+          onToggle={() => setSidebarOpen(!sidebarOpen)}
+          polygon={polygon}
+          onPolygonChange={handlePolygonChange}
+          routeParameters={routeParameters}
+          onParametersChange={handleParametersChange}
+          generatedRoute={generatedRoute}
+          isGenerating={isGenerating}
+          onRouteGenerated={handleRouteGenerated}
+          onError={handleError}
+        />
         
         <div className="flex-1 relative">
-          <BasicMap
+          <MapContainer
             polygon={polygon}
             onPolygonChange={handlePolygonChange}
             generatedRoute={generatedRoute}

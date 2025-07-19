@@ -132,204 +132,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
 // Route generation algorithm
 async function generateTransectRoute(polygon: any, parameters: any) {
   try {
-    console.log("Starting route generation with:");
-    console.log("Polygon:", JSON.stringify(polygon, null, 2));
-    console.log("Parameters:", JSON.stringify(parameters, null, 2));
-    // Convert polygon to Turf feature if needed
-    let polygonFeature;
-    console.log("Processing polygon type:", polygon?.type);
+    // Convert polygon to Turf.js format
+    const polygonFeature = turf.polygon(polygon.geometry.coordinates);
     
-    if (polygon?.type === 'Polygon') {
-      console.log("Creating polygon from coordinates");
-      
-      // Check if coordinates are in Web Mercator (large numbers) and convert if needed
-      const firstCoord = polygon.coordinates[0][0];
-      const isWebMercator = Math.abs(firstCoord[0]) > 1000 || Math.abs(firstCoord[1]) > 1000;
-      
-      if (isWebMercator) {
-        console.log("Converting from Web Mercator to WGS84");
-        // Convert Web Mercator (EPSG:3857) to WGS84 (EPSG:4326)
-        const convertedCoordinates = polygon.coordinates.map((ring: number[][]) => 
-          ring.map((coord: number[]) => {
-            const x = coord[0];
-            const y = coord[1];
-            
-            // Web Mercator to WGS84 conversion
-            const lng = (x / 20037508.34) * 180;
-            let lat = (y / 20037508.34) * 180;
-            lat = 180 / Math.PI * (2 * Math.atan(Math.exp(lat * Math.PI / 180)) - Math.PI / 2);
-            
-            return [lng, lat];
-          })
-        );
-        polygonFeature = turf.polygon(convertedCoordinates);
-        console.log("Converted coordinates:", convertedCoordinates[0]);
-      } else {
-        polygonFeature = turf.polygon(polygon.coordinates);
-      }
-    } else if (polygon?.type === 'Feature' && polygon?.geometry?.type === 'Polygon') {
-      console.log("Using existing feature polygon");
-      polygonFeature = polygon;
-    } else {
-      console.error("Invalid polygon format. Received:", polygon);
-      throw new Error(`Invalid polygon format: expected Polygon or Feature, got ${polygon?.type}`);
-    }
-    
-    console.log("Polygon feature created successfully");
-    
-    // Calculate effective line spacing (accounting for overlap)
-    const effectiveDistance = parameters.distance * (1 - parameters.overlap / 100);
-    
-    // Get polygon bounding box and expand it
+    // Calculate bounding box
     const bbox = turf.bbox(polygonFeature);
     const [minX, minY, maxX, maxY] = bbox;
     
-    // Calculate polygon dimensions
-    const width = maxX - minX;
-    const height = maxY - minY;
-    const diagonal = Math.sqrt(width * width + height * height);
-    
-    // Convert bearing to perpendicular direction for line generation
-    // We want lines perpendicular to the bearing direction
-    const perpBearing = (parameters.bearing + 90) % 360;
-    const perpBearingRad = (perpBearing * Math.PI) / 180;
-    
-    // Calculate how many lines we need to cover the polygon completely
-    // Project polygon diagonal onto the perpendicular bearing direction
-    const projectedWidth = Math.abs(width * Math.cos(perpBearingRad)) + Math.abs(height * Math.sin(perpBearingRad));
-    const lineCount = Math.ceil(projectedWidth * 111000 / effectiveDistance) + 2; // Add buffer lines
-    
-    console.log(`Generating ${lineCount} transect lines with ${effectiveDistance}m spacing`);
-    
-    // Get polygon center for line generation
-    const center = turf.center(polygonFeature).geometry.coordinates;
+    // Convert bearing to radians
+    const bearingRad = (parameters.bearing * Math.PI) / 180;
     
     // Generate parallel lines
     const transectLines = [];
     const waypoints = [];
     
-    // Calculate bearing in radians (needed for waypoint generation later)
-    const bearingRad = (parameters.bearing * Math.PI) / 180;
+    // Calculate line spacing (accounting for overlap)
+    const effectiveDistance = parameters.distance * (1 - parameters.overlap / 100);
     
+    // Generate transect lines based on bearing
+    const lineCount = Math.ceil((maxX - minX) / (effectiveDistance / 111000)); // Rough conversion to degrees
+    
+    // First pass: Generate all transect lines
     for (let i = 0; i < lineCount; i++) {
-      // Calculate offset from center along perpendicular bearing
-      const offset = (i - lineCount / 2) * (effectiveDistance / 111000);
+      const x = minX + (i * effectiveDistance / 111000);
       
-      // Calculate line start point by moving along perpendicular bearing
-      const offsetX = offset * Math.cos(perpBearingRad);
-      const offsetY = offset * Math.sin(perpBearingRad);
-      const lineCenter = [center[0] + offsetX, center[1] + offsetY];
-      
-      // Create a long line along the bearing direction
-      const lineLength = diagonal * 2; // Make it long enough to span the polygon
-      const lineLengthDegrees = lineLength;
-      const startX = lineCenter[0] - lineLengthDegrees * Math.cos(bearingRad);
-      const startY = lineCenter[1] - lineLengthDegrees * Math.sin(bearingRad);
-      const endX = lineCenter[0] + lineLengthDegrees * Math.cos(bearingRad);
-      const endY = lineCenter[1] + lineLengthDegrees * Math.sin(bearingRad);
-      
+      // Create line from south to north of bounding box
       const line = turf.lineString([
-        [startX, startY],
-        [endX, endY]
+        [x, minY - 0.01],
+        [x, maxY + 0.01]
       ]);
       
-      // Find intersections with polygon
+      // Rotate line by bearing
+      const rotatedLine = turf.transformRotate(line, parameters.bearing, { pivot: turf.center(polygonFeature) });
+      
+      // Clip line to polygon
       try {
-        const intersections = turf.lineIntersect(line, polygonFeature);
-        
-        if (intersections.features.length >= 2) {
-          // Sort intersection points along the line direction
-          const coords = intersections.features.map(f => f.geometry.coordinates);
-          coords.sort((a, b) => {
-            const distA = Math.sqrt(Math.pow(a[0] - startX, 2) + Math.pow(a[1] - startY, 2));
-            const distB = Math.sqrt(Math.pow(b[0] - startX, 2) + Math.pow(b[1] - startY, 2));
-            return distA - distB;
-          });
-          
-          // Create transect line from first to last intersection
-          const transectLine = turf.lineString([coords[0], coords[coords.length - 1]]);
+        const clippedLine = turf.lineIntersect(rotatedLine, polygonFeature);
+        if (clippedLine.features.length >= 2) {
+          // Convert intersection points to line, sort by latitude for consistency
+          const coords = clippedLine.features.map(f => f.geometry.coordinates);
+          const sortedCoords = coords.sort((a, b) => a[1] - b[1]); // Sort by latitude
+          const transectLine = turf.lineString([sortedCoords[0], sortedCoords[sortedCoords.length - 1]]);
           transectLines.push(transectLine);
         }
       } catch (e) {
-        console.warn("Failed to intersect line with polygon:", e);
+        console.warn("Failed to clip line to polygon:", e);
       }
     }
 
-    // Create waypoint path with curved U-turns following the working algorithm
-    console.log(`Creating waypoints for ${transectLines.length} transect lines with curved turns`);
-    
-    // Calculate bearing in radians for waypoint generation
-    const bearingRad = (parameters.bearing * Math.PI) / 180;
+    // Second pass: Create alternating waypoint path with curved U-turns
+    // Following the Python reference method for smooth curve generation
     const turnRadiusMeters = parameters.turnRadius || (parameters.distance * 0.5);
     
-    // Create alternating waypoint path with proper curved U-turns
-    for (let i = 0; i < transectLines.length; i++) {
-      const line = transectLines[i];
-      const lineCoords = line.geometry.coordinates;
-      
-      // Determine travel direction for alternating pattern
-      let travelStart: number[], travelEnd: number[];
-      if (i % 2 === 0) {
-        // Even lines: start to end
-        travelStart = lineCoords[0];
-        travelEnd = lineCoords[1];
-      } else {
-        // Odd lines: end to start (alternating pattern)
-        travelStart = lineCoords[1];
-        travelEnd = lineCoords[0];
-      }
-      
-      // Add waypoints along the transect line
-      const lineString = turf.lineString([travelStart, travelEnd]);
-      const lineLength = turf.length(lineString, { units: 'kilometers' });
-      const numWaypoints = Math.max(2, Math.ceil(lineLength * 8)); // 8 waypoints per km
-      
-      for (let j = 0; j <= numWaypoints; j++) {
-        const progress = j / numWaypoints;
-        const point = turf.along(lineString, progress * lineLength, { units: 'kilometers' });
-        waypoints.push({ lat: point.geometry.coordinates[1], lng: point.geometry.coordinates[0] });
-      }
-      
-      // Add curved turn to next line if not the last line
-      if (i < transectLines.length - 1) {
-        const nextLine = transectLines[i + 1];
-        const nextLineCoords = nextLine.geometry.coordinates;
-        
-        // Next line's start point (alternating pattern)
-        const nextTravelStart = ((i + 1) % 2 === 0) ? nextLineCoords[0] : nextLineCoords[1];
-        
-        // Generate curved turn waypoints
-        const radiusDegrees = turnRadiusMeters / 111000; // Convert meters to degrees
-        const numCurvePoints = 8; // Points for smooth curve
-        
-        // Simple arc generation - create waypoints along curved path
-        for (let t = 1; t <= numCurvePoints; t++) {
-          const progress = t / (numCurvePoints + 1);
-          
-          // Create curved path using simple interpolation with offset
-          const straightPoint = [
-            travelEnd[0] + progress * (nextTravelStart[0] - travelEnd[0]),
-            travelEnd[1] + progress * (nextTravelStart[1] - travelEnd[1])
-          ];
-          
-          // Add curve offset - perpendicular to the line direction
-          const perpDirection = (i % 2 === 0) ? 1 : -1; // Alternate curve direction
-          const curveOffset = Math.sin(progress * Math.PI) * radiusDegrees * perpDirection;
-          
-          // Calculate perpendicular direction
-          const lineDir = [nextTravelStart[0] - travelEnd[0], nextTravelStart[1] - travelEnd[1]];
-          const lineLen = Math.sqrt(lineDir[0] * lineDir[0] + lineDir[1] * lineDir[1]);
-          
-          if (lineLen > 0) {
-            const perpX = -lineDir[1] / lineLen * curveOffset;
-            const perpY = lineDir[0] / lineLen * curveOffset;
-            
-            const curvePoint = [straightPoint[0] + perpX, straightPoint[1] + perpY];
-            waypoints.push({ lat: curvePoint[1], lng: curvePoint[0] });
-          }
-        }
-      }
-    }
+    // Use existing bearingRad from above for direction vector calculations
+    const D = [Math.sin(bearingRad), Math.cos(bearingRad)]; // Direction vector
+    
+    // Helper function to align points in survey direction (like Python adjust_point)
+    const alignPoint = (point: number[], target: number, directionVector: number[]) => {
+      const current = point[0] * directionVector[0] + point[1] * directionVector[1];
+      const shift = target - current;
+      return [
+        point[0] + shift * directionVector[0],
+        point[1] + shift * directionVector[1]
+      ];
+    };
     
     // Build route with alternating pattern and curved turns
     for (let i = 0; i < transectLines.length; i++) {
@@ -497,8 +363,6 @@ async function generateTransectRoute(polygon: any, parameters: any) {
     // Estimate time (assuming 5 m/s average speed)
     const estimatedTime = Math.round(totalDistance / 5 / 60);
     
-    console.log(`Route generation completed: ${transectLines.length} lines, ${waypoints.length} waypoints`);
-    
     return {
       transectLines,
       waypoints,
@@ -510,10 +374,7 @@ async function generateTransectRoute(polygon: any, parameters: any) {
     
   } catch (error) {
     console.error("Error generating transect route:", error);
-    console.error("Stack trace:", error.stack);
-    console.error("Input polygon:", JSON.stringify(polygon, null, 2));
-    console.error("Input parameters:", JSON.stringify(parameters, null, 2));
-    throw new Error(`Failed to generate transect route: ${error.message}`);
+    throw new Error("Failed to generate transect route");
   }
 }
 
@@ -602,4 +463,3 @@ const parseCoordinateString = (coords: string): number[][] => {
     return [lng, lat]; // Only return lng, lat (ignore altitude)
   }).filter(coord => !isNaN(coord[0]) && !isNaN(coord[1])); // Filter out invalid coordinates
 };
-

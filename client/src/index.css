@@ -1,4 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://unpkg.com/leaflet@1.9.4/dist/leaflet.css');
+@import url('https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css');
 
 @tailwind base;
 @tailwind components;
@@ -115,37 +117,5 @@
   .map-controls {
     background: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(10px);
-  }
-
-  /* Esri Map Styles */
-  .esri-view {
-    height: 100% !important;
-    width: 100% !important;
-  }
-
-  .esri-ui-top-right .esri-component {
-    margin: 0 0 10px 10px;
-  }
-
-  .esri-view .esri-view-surface {
-    height: 100% !important;
-    width: 100% !important;
-  }
-
-  /* Mobile-specific fixes */
-  @media (max-width: 768px) {
-    /* Prevent body scroll when sidebar is open */
-    body.sidebar-open {
-      overflow: hidden;
-      position: fixed;
-      width: 100%;
-      height: 100%;
-    }
-    
-    /* Improve touch scrolling */
-    .mobile-scroll {
-      -webkit-overflow-scrolling: touch;
-      overscroll-behavior: contain;
-    }
   }
 }
