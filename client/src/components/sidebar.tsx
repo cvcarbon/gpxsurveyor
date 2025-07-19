@@ -6,6 +6,8 @@ import PolygonInput from "./polygon-input";
 import RouteParameters from "./route-parameters";
 import RouteGeneration from "./route-generation";
 import ExportOptions from "./export-options";
+import ArcGISSignIn from "./arcgis-signin";
+import ArcGISLayerControl from "./arcgis-layer-control";
 import { RouteParameters as RouteParametersType } from "@shared/schema";
 import { cn } from "@/lib/utils";
 
@@ -20,6 +22,8 @@ interface SidebarProps {
   isGenerating: boolean;
   onRouteGenerated: (route: any) => void;
   onError: (error: string) => void;
+  onLayerToggle?: (layerUrl: string, visible: boolean) => void;
+  layerVisibility?: Record<string, boolean>;
 }
 
 export default function Sidebar({
@@ -33,6 +37,8 @@ export default function Sidebar({
   isGenerating,
   onRouteGenerated,
   onError,
+  onLayerToggle,
+  layerVisibility = {},
 }: SidebarProps) {
   return (
     <div className={cn(
@@ -52,6 +58,17 @@ export default function Sidebar({
 
       {/* Scrollable Content */}
       <div className="flex-1 overflow-y-auto">
+        <div className="p-4 space-y-4">
+          <ArcGISSignIn />
+          
+          {onLayerToggle && (
+            <ArcGISLayerControl
+              onLayerToggle={onLayerToggle}
+              layerVisibility={layerVisibility}
+            />
+          )}
+        </div>
+        
         <PolygonInput
           polygon={polygon}
           onPolygonChange={onPolygonChange}

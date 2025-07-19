@@ -16,6 +16,7 @@ export default function RoutePlanner() {
   });
   const [generatedRoute, setGeneratedRoute] = useState<any>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [arcgisLayers, setArcgisLayers] = useState<Record<string, boolean>>({});
   const { toast } = useToast();
 
   const handlePolygonChange = (newPolygon: any) => {
@@ -44,6 +45,13 @@ export default function RoutePlanner() {
     });
   };
 
+  const handleLayerToggle = (layerUrl: string, visible: boolean) => {
+    setArcgisLayers(prev => ({
+      ...prev,
+      [layerUrl]: visible
+    }));
+  };
+
   return (
     <>
       <Helmet>
@@ -63,6 +71,8 @@ export default function RoutePlanner() {
           isGenerating={isGenerating}
           onRouteGenerated={handleRouteGenerated}
           onError={handleError}
+          onLayerToggle={handleLayerToggle}
+          layerVisibility={arcgisLayers}
         />
         
         <div className="flex-1 relative">
@@ -72,6 +82,7 @@ export default function RoutePlanner() {
             generatedRoute={generatedRoute}
             sidebarOpen={sidebarOpen}
             onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+            arcgisLayers={arcgisLayers}
           />
         </div>
       </div>

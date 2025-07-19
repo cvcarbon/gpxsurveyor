@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Expand, Trash2, Layers, ZoomIn, ZoomOut, Menu } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useArcGISAuth } from "@/lib/arcgis-auth";
 
 interface MapContainerProps {
   polygon: any;
@@ -12,6 +13,7 @@ interface MapContainerProps {
   drawingMode?: boolean;
   onDrawingModeChange?: (mode: boolean) => void;
   onToggleSidebar?: () => void;
+  arcgisLayers?: Record<string, boolean>;
 }
 
 export default function MapContainer({
@@ -22,6 +24,7 @@ export default function MapContainer({
   drawingMode = false,
   onDrawingModeChange,
   onToggleSidebar,
+  arcgisLayers = {},
 }: MapContainerProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
@@ -29,8 +32,10 @@ export default function MapContainer({
   const routeLayerRef = useRef<any>(null);
   const drawControlRef = useRef<any>(null);
   const drawnItemsRef = useRef<any>(null);
+  const arcgisLayersRef = useRef<Record<string, any>>({});
   const [mouseCoords, setMouseCoords] = useState({ lat: 29.3013, lng: -94.7977 });
   const [showLegend, setShowLegend] = useState(false);
+  const { isAuthenticated } = useArcGISAuth();
 
   useEffect(() => {
     if (typeof window !== "undefined" && mapRef.current && !mapInstanceRef.current) {
@@ -216,6 +221,79 @@ export default function MapContainer({
       setShowLegend(false);
     }
   }, [generatedRoute]);
+
+  // Handle ArcGIS layers
+  useEffect(() => {
+    if (!mapInstanceRef.current || !isAuthenticated) return;
+
+    Object.entries(arcgisLayers).forEach(async ([layerUrl, visible]) => {
+      if (visible && !arcgisLayersRef.current[layerUrl]) {
+        // Add ArcGIS layer
+        try {
+          const FeatureLayer = (await import("@arcgis/core/layers/FeatureLayer")).default;
+          
+          const featureLayer = new FeatureLayer({
+            url: layerUrl,
+            outFields: ["*"],
+            popupTemplate: {
+              title: "Lease Boundary",
+              content: [
+                {
+                  type: "fields",
+                  fieldInfos: [
+                    {
+                      fieldName: "OBJECTID",
+                      label: "Object ID"
+                    }
+                  ]
+                }
+              ]
+            }
+          });
+
+          await featureLayer.load();
+          
+          // Convert ArcGIS layer to Leaflet-compatible GeoJSON
+          const query = featureLayer.createQuery();
+          query.outFields = ["*"];
+          query.returnGeometry = true;
+          
+          const featureSet = await featureLayer.queryFeatures(query);
+          
+          import("leaflet").then((L) => {
+            const geoJsonLayer = L.geoJSON(featureSet.toJSON(), {
+              style: {
+                color: '#ff6b35',
+                weight: 2,
+                opacity: 0.8,
+                fillColor: '#ff6b35',
+                fillOpacity: 0.3
+              },
+              onEachFeature: (feature, layer) => {
+                if (feature.properties) {
+                  const popupContent = Object.entries(feature.properties)
+                    .filter(([key, value]) => value !== null && value !== undefined)
+                    .map(([key, value]) => `<strong>${key}:</strong> ${value}`)
+                    .join('<br>');
+                  layer.bindPopup(popupContent);
+                }
+              }
+            });
+            
+            arcgisLayersRef.current[layerUrl] = geoJsonLayer;
+            geoJsonLayer.addTo(mapInstanceRef.current);
+          });
+
+        } catch (error) {
+          console.error("Error adding ArcGIS layer:", error);
+        }
+      } else if (!visible && arcgisLayersRef.current[layerUrl]) {
+        // Remove ArcGIS layer
+        mapInstanceRef.current.removeLayer(arcgisLayersRef.current[layerUrl]);
+        delete arcgisLayersRef.current[layerUrl];
+      }
+    });
+  }, [arcgisLayers, isAuthenticated]);
 
   const handleZoomToFit = () => {
     if (mapInstanceRef.current) {
