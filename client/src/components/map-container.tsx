@@ -144,55 +144,62 @@ export default function MapContainer({
           ];
 
           layerConfigs.forEach((config, index) => {
-            // Test if authentication is required
+            // First, test if authentication is required
             fetch(`${config.url}?f=json`)
-              .then(response => response.json())
-              .then(serviceInfo => {
-                console.log(`${config.name} service response:`, serviceInfo);
-                
-                // Check if token is required
-                if (serviceInfo.error && serviceInfo.error.code === 499) {
-                  console.log(`${config.name} requires authentication`);
-                  alert(`${config.name} requires ArcGIS authentication. Please sign in to your account in the popup window.`);
-                  window.open('https://www.arcgis.com/home/signin.html', '_blank', 'width=800,height=600');
+              .then(response => {
+                if (response.status === 403 || response.status === 401) {
+                  console.log(`Authentication required for ${config.name}. Opening login page...`);
+                  // Open ArcGIS Online login in a new tab
+                  const loginUrl = `https://www.arcgis.com/sharing/rest/oauth2/authorize?client_id=esriLeaflet&response_type=token&redirect_uri=${encodeURIComponent(window.location.origin)}`;
+                  window.open(loginUrl, '_blank');
+                  return null;
+                } else if (response.ok) {
+                  return response.json();
+                } else {
+                  throw new Error(`HTTP ${response.status}`);
                 }
-                
-                // Create the feature layer regardless (will show auth prompts as needed)
-                const layer = esriLeaflet.featureLayer({
-                  url: config.url,
-                  style: {
-                    color: config.color,
-                    weight: 2,
-                    opacity: 0.8,
-                    fillOpacity: 0.3
-                  }
-                });
+              })
+              .then(serviceInfo => {
+                if (serviceInfo) {
+                  console.log(`${config.name} service info:`, serviceInfo);
+                  
+                  // Create the feature layer
+                  const layer = esriLeaflet.featureLayer({
+                    url: config.url,
+                    style: {
+                      color: config.color,
+                      weight: 2,
+                      opacity: 0.8,
+                      fillOpacity: 0.3
+                    }
+                  });
 
-                layer.on('loading', () => {
-                  console.log(`Loading ${config.name} features...`);
-                });
+                  layer.on('loading', () => {
+                    console.log(`Loading ${config.name} features...`);
+                  });
 
-                layer.on('load', () => {
-                  console.log(`${config.name} layer loaded successfully`);
-                });
+                  layer.on('load', () => {
+                    console.log(`${config.name} layer loaded successfully`);
+                  });
 
-                layer.on('requesterror', (error: any) => {
-                  console.error(`${config.name} layer error:`, error);
-                  if (error.code === 499 || error.code === 403 || error.code === 401) {
-                    console.log(`Authentication required for ${config.name}`);
-                    alert(`Please sign in to your ArcGIS account to access ${config.name} data.`);
-                    window.open('https://www.arcgis.com/home/signin.html', '_blank', 'width=800,height=600');
-                  }
-                });
+                  layer.on('requesterror', (error: any) => {
+                    console.error(`${config.name} layer error:`, error);
+                    if (error.code === 403 || error.code === 401) {
+                      console.log(`Please sign in to access ${config.name}`);
+                      alert(`Please sign in to your ArcGIS account to view ${config.name} data. A login page will open in a new tab.`);
+                      const loginUrl = `https://www.arcgis.com/sharing/rest/oauth2/authorize?client_id=esriLeaflet&response_type=token&redirect_uri=${encodeURIComponent(window.location.origin)}`;
+                      window.open(loginUrl, '_blank');
+                    }
+                  });
 
-                // Add layer to map
-                layer.addTo(map);
-                esriLayersRef.current.push(layer);
+                  // Add layer to map
+                  layer.addTo(map);
+                  esriLayersRef.current.push(layer);
+                }
               })
               .catch(error => {
-                console.error(`Error with ${config.name} service:`, error);
-                
-                // Still create layer - authentication might be handled by browser
+                console.error(`Error testing ${config.name} service:`, error);
+                // Try to load anyway, might work with different auth method
                 const layer = esriLeaflet.featureLayer({
                   url: config.url,
                   style: {
@@ -204,9 +211,9 @@ export default function MapContainer({
                 });
 
                 layer.on('requesterror', (error: any) => {
-                  console.log(`Authentication needed for ${config.name}`);
+                  console.log(`Authentication needed for ${config.name} - opening login page`);
                   alert(`Please sign in to your ArcGIS account to view ${config.name} data.`);
-                  window.open('https://www.arcgis.com/home/signin.html', '_blank', 'width=800,height=600');
+                  window.open('https://www.arcgis.com/home/signin.html', '_blank');
                 });
 
                 layer.addTo(map);
