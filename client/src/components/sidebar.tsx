@@ -46,7 +46,15 @@ export default function Sidebar({
             <h1 className="text-xl font-bold text-gray-900">GPX Surveyor</h1>
             <p className="text-sm text-gray-500">Autopilot Route Generator</p>
           </div>
-
+          
+          <Button
+            variant="ghost" 
+            size="sm"
+            onClick={onToggle}
+            className="lg:hidden p-2"
+          >
+            <X className="h-5 w-5" />
+          </Button>
         </div>
       </div>
 

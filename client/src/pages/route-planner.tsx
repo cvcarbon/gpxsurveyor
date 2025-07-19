@@ -76,7 +76,7 @@ export default function RoutePlanner() {
           {/* Mobile backdrop */}
           {sidebarOpen && (
             <div 
-              className="absolute inset-0 bg-black bg-opacity-50 md:hidden"
+              className="fixed inset-0 bg-black bg-opacity-50 md:hidden z-40"
               onClick={() => setSidebarOpen(false)}
             />
           )}
