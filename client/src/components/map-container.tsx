@@ -253,10 +253,16 @@ export default function MapContainer({
 
           await featureLayer.load();
           
+          // First, get the total count of features to better understand pagination
+          const countQuery = featureLayer.createQuery();
+          countQuery.where = "1=1"; // Get all features
+          const featureCount = await featureLayer.queryFeatureCount(countQuery);
+          console.log(`Total features in layer: ${featureCount}`);
+          
           // Get all features using pagination to bypass 2000 feature limit
           const allFeatures = [];
           let offset = 0;
-          const maxRecordCount = 2000;
+          const maxRecordCount = 1000; // Reduce batch size for better performance
           let hasMoreFeatures = true;
           
           console.log("Fetching all features with pagination...");
@@ -270,15 +276,25 @@ export default function MapContainer({
             
             const featureSet = await featureLayer.queryFeatures(query);
             
+            console.log(`Query result: ${featureSet.features.length} features, exceededTransferLimit: ${featureSet.exceededTransferLimit}`);
+            
             if (featureSet.features.length === 0) {
               hasMoreFeatures = false;
+              console.log("No more features to fetch");
             } else {
               allFeatures.push(...featureSet.features);
               offset += featureSet.features.length;
               console.log(`Fetched ${featureSet.features.length} features, total: ${allFeatures.length}`);
               
-              // If we got less than the max, we've reached the end
-              if (featureSet.features.length < maxRecordCount) {
+              // Check if we've reached the end based on exceededTransferLimit or fewer features than requested
+              if (!featureSet.exceededTransferLimit || featureSet.features.length < maxRecordCount) {
+                hasMoreFeatures = false;
+                console.log("Reached end of features");
+              }
+              
+              // Safety check to prevent infinite loops
+              if (allFeatures.length > 50000) {
+                console.warn("Safety limit reached, stopping pagination");
                 hasMoreFeatures = false;
               }
             }
