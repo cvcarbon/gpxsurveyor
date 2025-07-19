@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Helmet } from "react-helmet";
 import Sidebar from "@/components/sidebar";
-import EsriMapContainer from "@/components/esri-map-container";
+import SimpleEsriMap from "@/components/simple-esri-map";
 import { useToast } from "@/hooks/use-toast";
 import { RouteParameters } from "@shared/schema";
 
@@ -66,7 +66,7 @@ export default function RoutePlanner() {
         />
         
         <div className="flex-1 relative">
-          <EsriMapContainer
+          <SimpleEsriMap
             polygon={polygon}
             onPolygonChange={handlePolygonChange}
             generatedRoute={generatedRoute}
