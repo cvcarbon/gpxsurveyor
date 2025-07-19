@@ -53,21 +53,14 @@ export default function Sidebar({
             <h1 className="text-xl font-bold text-gray-900">GPX Surveyor</h1>
             <p className="text-sm text-gray-500">Autopilot Route Generator</p>
           </div>
-
+          <ArcGISSignIn />
         </div>
       </div>
 
       {/* Scrollable Content */}
       <div className="flex-1 overflow-y-auto">
         <div className="p-4 space-y-4">
-          <ArcGISSignIn />
-          
-          {onLayerToggle && (
-            <ArcGISLayerControl
-              onLayerToggle={onLayerToggle}
-              layerVisibility={layerVisibility}
-            />
-          )}
+          {/* ArcGIS layers panel hidden per user request */}
         </div>
         
         <PolygonInput
