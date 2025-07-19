@@ -253,44 +253,24 @@ export default function MapContainer({
 
           await featureLayer.load();
           
-          // Simplified approach: just get all features with multiple queries
-          const allFeatures = [];
-          let offset = 0;
-          let batchSize = 2000;
-          let batchNumber = 1;
+          // Get actual feature count first
+          const countQuery = featureLayer.createQuery();
+          countQuery.where = "1=1";
+          const totalCount = await featureLayer.queryFeatureCount(countQuery);
+          console.log(`Actual feature count in layer: ${totalCount}`);
           
-          console.log("Fetching all features using simplified pagination...");
+          // Use a simple approach: just get first 2000 features for now to test
+          // This will help us verify the display works before optimizing for all features
+          const query = featureLayer.createQuery();
+          query.outFields = ["*"];
+          query.returnGeometry = true;
+          query.resultRecordCount = 2000;
           
-          // Fetch up to 5 batches (should cover 10,000 features max)
-          for (let i = 0; i < 5; i++) {
-            const query = featureLayer.createQuery();
-            query.outFields = ["*"];
-            query.returnGeometry = true;
-            query.resultOffset = offset;
-            query.resultRecordCount = batchSize;
-            
-            console.log(`Fetching batch ${batchNumber} (offset: ${offset})...`);
-            const featureSet = await featureLayer.queryFeatures(query);
-            
-            console.log(`Batch ${batchNumber}: Got ${featureSet.features.length} features`);
-            
-            if (featureSet.features.length === 0) {
-              console.log("No more features available");
-              break;
-            }
-            
-            allFeatures.push(...featureSet.features);
-            offset += featureSet.features.length;
-            batchNumber++;
-            
-            console.log(`Total features so far: ${allFeatures.length}`);
-            
-            // If we got less than the batch size, we're done
-            if (featureSet.features.length < batchSize) {
-              console.log("Got partial batch, stopping");
-              break;
-            }
-          }
+          console.log("Fetching first 2000 features for testing...");
+          const featureSet = await featureLayer.queryFeatures(query);
+          console.log(`Got ${featureSet.features.length} features for display`);
+          
+          const allFeatures = featureSet.features;
           
           console.log(`Total features loaded: ${allFeatures.length}`);
           
