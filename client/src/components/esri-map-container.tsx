@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Expand, Trash2, Layers, ZoomIn, ZoomOut, Menu } from "lucide-react";
@@ -127,21 +127,24 @@ export default function MapContainer({
       }
     });
 
-    // Add basemap gallery
-    const basemapGallery = new BasemapGallery({
-      view: view
+    // Wait for view to be ready
+    view.when(() => {
+      // Add basemap gallery
+      const basemapGallery = new BasemapGallery({
+        view: view
+      });
+
+      const bgExpand = new ExpandWidget({
+        view: view,
+        content: basemapGallery,
+        expandIconClass: "esri-icon-basemap"
+      });
+
+      view.ui.add(bgExpand, "top-right");
+
+      // Add zoom controls
+      view.ui.move("zoom", "top-right");
     });
-
-    const bgExpand = new ExpandWidget({
-      view: view,
-      content: basemapGallery,
-      expandIconClass: "esri-icon-basemap"
-    });
-
-    view.ui.add(bgExpand, "top-right");
-
-    // Add zoom controls
-    view.ui.move("zoom", "top-right");
 
     // Cleanup
     return () => {
@@ -311,12 +314,11 @@ export default function MapContainer({
   };
 
   return (
-    <div className="relative h-full">
+    <div className="relative h-full w-full">
       {/* Map Container */}
       <div
         ref={mapRef}
-        className="h-full w-full"
-        style={{ minHeight: "100vh" }}
+        className="absolute inset-0"
       />
 
       {/* Sidebar Toggle Button (shown when sidebar is closed) */}

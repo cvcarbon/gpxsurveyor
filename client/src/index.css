@@ -1,6 +1,29 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 @import url('https://js.arcgis.com/4.28/esri/themes/light/main.css');
 
+/* Fix for Esri map container */
+.esri-view {
+  height: 100%;
+  width: 100%;
+}
+
+.esri-view-surface {
+  background-color: transparent !important;
+}
+
+/* Ensure map container takes full space */
+.esri-ui {
+  pointer-events: auto;
+}
+
+.esri-view-root {
+  position: absolute !important;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
