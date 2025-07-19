@@ -192,6 +192,8 @@ export default function MapContainer({
             if (currentToken) {
               layerOptions.token = currentToken;
               console.log(`Adding ${config.name} with authentication token`);
+            } else {
+              console.log(`Adding ${config.name} without token - will prompt for auth if needed`);
             }
 
             const layer = esriLeaflet.featureLayer(layerOptions);
@@ -202,13 +204,27 @@ export default function MapContainer({
 
             layer.on('load', () => {
               console.log(`${config.name} layer loaded successfully`);
+              // Check if any features were actually loaded
+              setTimeout(() => {
+                const featureCount = layer.getLayers ? layer.getLayers().length : 'unknown';
+                console.log(`${config.name} feature count:`, featureCount);
+              }, 1000);
             });
 
             layer.on('requesterror', (error: any) => {
-              console.log(`${config.name} requires authentication (${error.code})`);
+              console.error(`${config.name} request error:`, error);
               if ((error.code === 403 || error.code === 401 || error.code === 499) && !authPromptShown) {
                 showAuthPrompt();
               }
+            });
+
+            // Add debug event listeners
+            layer.on('addfeature', (e: any) => {
+              console.log(`${config.name} - Feature added:`, e.feature.id || 'no id');
+            });
+
+            layer.on('removefeature', (e: any) => {
+              console.log(`${config.name} - Feature removed:`, e.feature.id || 'no id');
             });
 
             // Add layer to map
