@@ -94,8 +94,11 @@ export default function EsriMapContainer({
       const sketchWidget = new Sketch({
         layer: polygonLayer,
         view: mapView,
-        creationMode: "update",
+        creationMode: "single",
         availableCreateTools: ["polygon"],
+        defaultCreateOptions: {
+          hasZ: false
+        },
         visibleElements: {
           createTools: {
             point: false,
@@ -116,9 +119,14 @@ export default function EsriMapContainer({
       sketchWidget.on("create", (event: any) => {
         if (event.state === "complete") {
           const geometry = event.graphic.geometry;
-          if (geometry.type === "polygon") {
+          if (geometry && geometry.type === "polygon" && geometry.rings && geometry.rings.length > 0) {
             // Convert Esri polygon to GeoJSON
             const coordinates = geometry.rings[0].map((ring: number[]) => [ring[0], ring[1]]);
+            // Ensure the polygon is closed
+            if (coordinates[0][0] !== coordinates[coordinates.length - 1][0] || 
+                coordinates[0][1] !== coordinates[coordinates.length - 1][1]) {
+              coordinates.push([coordinates[0][0], coordinates[0][1]]);
+            }
             const geoJsonPolygon = {
               type: "Polygon",
               coordinates: [coordinates]
@@ -129,11 +137,16 @@ export default function EsriMapContainer({
       });
 
       sketchWidget.on("update", (event: any) => {
-        if (event.state === "complete") {
+        if (event.state === "complete" && event.graphics && event.graphics.length > 0) {
           const geometry = event.graphics[0].geometry;
-          if (geometry.type === "polygon") {
+          if (geometry && geometry.type === "polygon" && geometry.rings && geometry.rings.length > 0) {
             // Convert Esri polygon to GeoJSON
             const coordinates = geometry.rings[0].map((ring: number[]) => [ring[0], ring[1]]);
+            // Ensure the polygon is closed
+            if (coordinates[0][0] !== coordinates[coordinates.length - 1][0] || 
+                coordinates[0][1] !== coordinates[coordinates.length - 1][1]) {
+              coordinates.push([coordinates[0][0], coordinates[0][1]]);
+            }
             const geoJsonPolygon = {
               type: "Polygon",
               coordinates: [coordinates]
@@ -147,6 +160,11 @@ export default function EsriMapContainer({
       setMap(esriMap);
       setView(mapView);
       setSketch(sketchWidget);
+
+      // Expose references for cleanup and global access
+      (window as any).mapClearFunction = handleClearMap;
+      (window as any).esriMapView = mapView;
+      (window as any).esriMap = esriMap;
     });
 
     // Cleanup
@@ -159,7 +177,7 @@ export default function EsriMapContainer({
 
   // Update polygon display
   useEffect(() => {
-    if (!map || !view || !polygon) return;
+    if (!map || !view) return;
 
     window.require([
       "esri/Graphic",
@@ -168,30 +186,42 @@ export default function EsriMapContainer({
       "esri/symbols/SimpleLineSymbol"
     ], (Graphic: any, Polygon: any, SimpleFillSymbol: any, SimpleLineSymbol: any) => {
       const polygonLayer = map.findLayerById("polygon-layer");
-      polygonLayer.removeAll();
+      if (!polygonLayer) return;
+      
+      // Only clear if we're not in drawing mode to avoid conflicts with sketch widget
+      if (!drawingMode) {
+        polygonLayer.removeAll();
+      }
 
-      if (polygon && polygon.coordinates) {
-        const esriPolygon = new Polygon({
-          rings: polygon.coordinates,
-          spatialReference: { wkid: 4326 }
-        });
+      if (polygon && polygon.coordinates && polygon.coordinates.length > 0) {
+        try {
+          const esriPolygon = new Polygon({
+            rings: polygon.coordinates,
+            spatialReference: { wkid: 4326 }
+          });
 
-        const polygonGraphic = new Graphic({
-          geometry: esriPolygon,
-          symbol: new SimpleFillSymbol({
-            color: [0, 100, 255, 0.3],
-            outline: new SimpleLineSymbol({
-              color: [0, 100, 255],
-              width: 2
+          const polygonGraphic = new Graphic({
+            geometry: esriPolygon,
+            symbol: new SimpleFillSymbol({
+              color: [0, 100, 255, 0.3],
+              outline: new SimpleLineSymbol({
+                color: [0, 100, 255],
+                width: 2
+              })
             })
-          })
-        });
+          });
 
-        polygonLayer.add(polygonGraphic);
-        view.goTo(polygonGraphic.geometry.extent);
+          // Only add if not already drawing to avoid conflicts
+          if (!drawingMode) {
+            polygonLayer.add(polygonGraphic);
+            view.goTo(polygonGraphic.geometry.extent.expand(1.2));
+          }
+        } catch (error) {
+          console.warn("Error displaying polygon:", error);
+        }
       }
     });
-  }, [polygon, map, view]);
+  }, [polygon, map, view, drawingMode]);
 
   // Update route display
   useEffect(() => {
@@ -294,7 +324,16 @@ export default function EsriMapContainer({
   };
 
   const handleClearMap = () => {
-    if (!map) return;
+    if (!map || !sketch || !view) return;
+    
+    // Cancel any active drawing first
+    try {
+      sketch.cancel();
+      view.ui.remove(sketch);
+      onDrawingModeChange?.(false);
+    } catch (e) {
+      // Ignore errors
+    }
     
     const polygonLayer = map.findLayerById("polygon-layer");
     const routeLayer = map.findLayerById("route-layer");
@@ -309,14 +348,34 @@ export default function EsriMapContainer({
     if (!sketch || !view) return;
     
     if (drawingMode) {
-      sketch.cancel();
+      // Cancel any active drawing
+      try {
+        sketch.cancel();
+      } catch (e) {
+        // Ignore errors when canceling
+      }
       view.ui.remove(sketch);
+      onDrawingModeChange?.(false);
     } else {
+      // Clear existing graphics before starting new draw
+      const polygonLayer = map?.findLayerById("polygon-layer");
+      if (polygonLayer) {
+        polygonLayer.removeAll();
+      }
+      
       view.ui.add(sketch, "top-right");
-      sketch.create("polygon");
+      
+      // Start drawing with a small delay to ensure UI is ready
+      setTimeout(() => {
+        try {
+          sketch.create("polygon");
+        } catch (e) {
+          console.warn("Could not start polygon creation:", e);
+        }
+      }, 100);
+      
+      onDrawingModeChange?.(true);
     }
-    
-    onDrawingModeChange?.(!drawingMode);
   };
 
   return (
