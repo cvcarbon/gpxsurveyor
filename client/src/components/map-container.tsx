@@ -130,6 +130,7 @@ export default function MapContainer({
           console.log("Loading Lease Boundaries and Infrastructure layers...");
           
           let authPromptShown = false;
+          let currentToken = localStorage.getItem('arcgis_token');
           
           const layerConfigs = [
             {
@@ -147,16 +148,31 @@ export default function MapContainer({
           const showAuthPrompt = () => {
             if (!authPromptShown) {
               authPromptShown = true;
-              const userConfirm = confirm("These map layers require ArcGIS authentication. Would you like to sign in to view the lease boundaries and bedding documentation data?");
+              const userConfirm = confirm("These map layers require ArcGIS authentication. Click OK to sign in, then refresh this page after authentication.");
               if (userConfirm) {
-                window.open('https://www.arcgis.com/home/signin.html', '_blank');
+                const clientId = 'arcgisonline';
+                const redirectUri = encodeURIComponent(window.location.origin + window.location.pathname);
+                const authUrl = `https://www.arcgis.com/sharing/rest/oauth2/authorize?client_id=${clientId}&response_type=token&expiration=1440&redirect_uri=${redirectUri}`;
+                console.log("Opening authentication URL:", authUrl);
+                window.location.href = authUrl;
               }
             }
           };
 
+          // Check for token in URL (after OAuth redirect)
+          const urlParams = new URLSearchParams(window.location.hash.substring(1));
+          const tokenFromUrl = urlParams.get('access_token');
+          if (tokenFromUrl) {
+            console.log("Found token in URL, saving to localStorage");
+            localStorage.setItem('arcgis_token', tokenFromUrl);
+            currentToken = tokenFromUrl;
+            // Clean up URL
+            window.history.replaceState({}, document.title, window.location.pathname);
+          }
+
           layerConfigs.forEach((config) => {
-            // Create the feature layer directly
-            const layer = esriLeaflet.featureLayer({
+            // Create the feature layer with token if available
+            const layerOptions: any = {
               url: config.url,
               style: {
                 color: config.color,
@@ -164,7 +180,14 @@ export default function MapContainer({
                 opacity: 0.8,
                 fillOpacity: 0.3
               }
-            });
+            };
+
+            if (currentToken) {
+              layerOptions.token = currentToken;
+              console.log(`Adding ${config.name} with authentication token`);
+            }
+
+            const layer = esriLeaflet.featureLayer(layerOptions);
 
             layer.on('loading', () => {
               console.log(`Loading ${config.name} features...`);
