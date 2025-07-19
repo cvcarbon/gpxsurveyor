@@ -257,20 +257,53 @@ export default function MapContainer({
           const countQuery = featureLayer.createQuery();
           countQuery.where = "1=1";
           const totalCount = await featureLayer.queryFeatureCount(countQuery);
-          console.log(`Actual feature count in layer: ${totalCount}`);
+          console.log(`Total features in layer: ${totalCount}`);
           
-          // Use a simple approach: just get first 2000 features for now to test
-          // This will help us verify the display works before optimizing for all features
-          const query = featureLayer.createQuery();
-          query.outFields = ["*"];
-          query.returnGeometry = true;
-          query.resultRecordCount = 2000;
+          // Proper pagination to get all features
+          const allFeatures = [];
+          const batchSize = 2000;
+          let currentOffset = 0;
           
-          console.log("Fetching first 2000 features for testing...");
-          const featureSet = await featureLayer.queryFeatures(query);
-          console.log(`Got ${featureSet.features.length} features for display`);
+          console.log("Fetching all features with proper pagination...");
           
-          const allFeatures = featureSet.features;
+          // Calculate how many batches we need
+          const totalBatches = Math.ceil(totalCount / batchSize);
+          console.log(`Need ${totalBatches} batches to get all ${totalCount} features`);
+          
+          for (let batch = 0; batch < totalBatches; batch++) {
+            const query = featureLayer.createQuery();
+            query.outFields = ["*"];
+            query.returnGeometry = true;
+            query.resultOffset = currentOffset;
+            query.resultRecordCount = batchSize;
+            
+            console.log(`Fetching batch ${batch + 1}/${totalBatches} (offset: ${currentOffset})`);
+            
+            try {
+              const featureSet = await featureLayer.queryFeatures(query);
+              const batchFeatures = featureSet.features;
+              
+              if (batchFeatures.length === 0) {
+                console.log("No more features returned, stopping");
+                break;
+              }
+              
+              allFeatures.push(...batchFeatures);
+              currentOffset += batchFeatures.length;
+              
+              console.log(`Batch ${batch + 1}: got ${batchFeatures.length} features, total: ${allFeatures.length}/${totalCount}`);
+              
+              // If this batch was smaller than expected, we're done
+              if (batchFeatures.length < batchSize) {
+                console.log("Partial batch received, all features loaded");
+                break;
+              }
+              
+            } catch (error) {
+              console.error(`Error fetching batch ${batch + 1}:`, error);
+              break;
+            }
+          }
           
           console.log(`Total features loaded: ${allFeatures.length}`);
           
