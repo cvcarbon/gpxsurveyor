@@ -36,22 +36,23 @@ export default function Sidebar({
 }: SidebarProps) {
   return (
     <div className={cn(
-      "sidebar-transition w-96 bg-white shadow-xl border-r border-gray-200 flex flex-col",
-      !open && "-translate-x-full"
+      "h-full w-full bg-white shadow-xl border-r border-gray-200 flex flex-col",
+      "md:w-96", // Fixed width on desktop
+      open ? "translate-x-0" : "-translate-x-full md:translate-x-0"
     )}>
       {/* Header */}
-      <div className="p-6 border-b border-gray-200">
+      <div className="p-4 md:p-6 border-b border-gray-200 shrink-0">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold text-gray-900">GPX Surveyor</h1>
-            <p className="text-sm text-gray-500">Autopilot Route Generator</p>
+            <h1 className="text-lg md:text-xl font-bold text-gray-900">GPX Surveyor</h1>
+            <p className="text-xs md:text-sm text-gray-500">Autopilot Route Generator</p>
           </div>
           
           <Button
             variant="ghost" 
             size="sm"
             onClick={onToggle}
-            className="lg:hidden p-2"
+            className="md:hidden p-2 touch-manipulation min-h-[44px] min-w-[44px]"
           >
             <X className="h-5 w-5" />
           </Button>
@@ -59,7 +60,7 @@ export default function Sidebar({
       </div>
 
       {/* Scrollable Content */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto overscroll-contain mobile-scroll">
         <PolygonInput
           polygon={polygon}
           onPolygonChange={onPolygonChange}

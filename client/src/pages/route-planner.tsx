@@ -31,6 +31,21 @@ export default function RoutePlanner() {
   const [isGenerating, setIsGenerating] = useState(false);
   const { toast } = useToast();
 
+  // Manage body scroll lock on mobile when sidebar is open
+  useEffect(() => {
+    if (window.innerWidth < 768) {
+      if (sidebarOpen) {
+        document.body.classList.add('sidebar-open');
+      } else {
+        document.body.classList.remove('sidebar-open');
+      }
+    }
+
+    return () => {
+      document.body.classList.remove('sidebar-open');
+    };
+  }, [sidebarOpen]);
+
   const handlePolygonChange = (newPolygon: any) => {
     setPolygon(newPolygon);
     setGeneratedRoute(null); // Clear previous route
@@ -65,40 +80,34 @@ export default function RoutePlanner() {
       </Helmet>
       
       <div className="flex h-screen overflow-hidden">
-        {/* Mobile-responsive Sidebar */}
+        {/* Mobile backdrop */}
+        {sidebarOpen && (
+          <div 
+            className="fixed inset-0 bg-black bg-opacity-50 md:hidden z-40"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+        
+        {/* Sidebar Container */}
         <div className={`
           ${sidebarOpen 
-            ? 'fixed inset-0 z-50 md:relative md:inset-auto md:w-96' 
+            ? 'fixed left-0 top-0 h-full w-80 z-50 md:relative md:w-96' 
             : 'hidden md:block md:w-0'
           }
-          transition-all duration-300 overflow-hidden
+          transition-all duration-300 md:overflow-hidden
         `}>
-          {/* Mobile backdrop */}
-          {sidebarOpen && (
-            <div 
-              className="fixed inset-0 bg-black bg-opacity-50 md:hidden z-40"
-              onClick={() => setSidebarOpen(false)}
-            />
-          )}
-          
-          <div className={`
-            relative z-10 h-full bg-white
-            ${sidebarOpen ? 'w-80 md:w-96' : 'w-0'}
-            transition-all duration-300
-          `}>
-            <Sidebar
-              open={sidebarOpen}
-              onToggle={() => setSidebarOpen(!sidebarOpen)}
-              polygon={polygon}
-              onPolygonChange={handlePolygonChange}
-              routeParameters={routeParameters}
-              onParametersChange={handleParametersChange}
-              generatedRoute={generatedRoute}
-              isGenerating={isGenerating}
-              onRouteGenerated={handleRouteGenerated}
-              onError={handleError}
-            />
-          </div>
+          <Sidebar
+            open={sidebarOpen}
+            onToggle={() => setSidebarOpen(!sidebarOpen)}
+            polygon={polygon}
+            onPolygonChange={handlePolygonChange}
+            routeParameters={routeParameters}
+            onParametersChange={handleParametersChange}
+            generatedRoute={generatedRoute}
+            isGenerating={isGenerating}
+            onRouteGenerated={handleRouteGenerated}
+            onError={handleError}
+          />
         </div>
         
         <div className="flex-1 relative">
