@@ -6,6 +6,38 @@
     <title>GPX Surveyor</title>
     <link rel="stylesheet" href="https://js.arcgis.com/4.30/esri/themes/light/main.css">
     <script src="https://js.arcgis.com/4.30/"></script>
+    
+    <!-- Disable Vite Error Overlay -->
+    <script>
+      // Disable Vite error overlay for user aborted requests
+      window.addEventListener('error', function(e) {
+        if (e.message && e.message.includes('user aborted')) {
+          e.preventDefault();
+          e.stopPropagation();
+          return false;
+        }
+      });
+      
+      // Hide error overlay when it appears
+      document.addEventListener('DOMContentLoaded', function() {
+        const observer = new MutationObserver(function(mutations) {
+          mutations.forEach(function(mutation) {
+            mutation.addedNodes.forEach(function(node) {
+              if (node.nodeType === 1 && (
+                node.id === 'vite-error-overlay' || 
+                node.classList?.contains('vite-error-overlay') ||
+                node.innerHTML?.includes('runtime-error-plugin') ||
+                node.innerHTML?.includes('user aborted')
+              )) {
+                node.style.display = 'none';
+                console.log('Vite error overlay hidden');
+              }
+            });
+          });
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
+      });
+    </script>
   </head>
   <body>
     <div id="root"></div>
