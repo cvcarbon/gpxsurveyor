@@ -6,7 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { RouteParameters } from "@shared/schema";
 
 export default function RoutePlanner() {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false); // Start closed on mobile
   const [polygon, setPolygon] = useState<any>(null);
   const [routeParameters, setRouteParameters] = useState<RouteParameters>({
     distance: 50,
@@ -63,6 +63,14 @@ export default function RoutePlanner() {
       </Helmet>
       
       <div className="flex h-screen overflow-hidden">
+        {/* Mobile overlay */}
+        {sidebarOpen && (
+          <div 
+            className="fixed inset-0 bg-black bg-opacity-50 z-30 md:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+        
         <Sidebar
           open={sidebarOpen}
           onToggle={() => setSidebarOpen(!sidebarOpen)}

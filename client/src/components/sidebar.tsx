@@ -43,7 +43,7 @@ export default function Sidebar({
 }: SidebarProps) {
   return (
     <div className={cn(
-      "sidebar-transition w-96 bg-white shadow-xl border-r border-gray-200 flex flex-col",
+      "sidebar-transition w-96 bg-white shadow-xl border-r border-gray-200 flex flex-col fixed left-0 top-0 h-full z-40 md:relative md:z-auto",
       !open && "-translate-x-full"
     )}>
       {/* Header */}
@@ -53,7 +53,18 @@ export default function Sidebar({
             <h1 className="text-xl font-bold text-gray-900">GPX Surveyor</h1>
             <p className="text-sm text-gray-500">Autopilot Route Generator</p>
           </div>
-          <ArcGISSignIn />
+          <div className="flex items-center gap-2">
+            <ArcGISSignIn />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onToggle}
+              className="md:hidden"
+              title="Close sidebar"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </div>
 

@@ -506,7 +506,7 @@ export default function MapContainer({
 
       {/* Sidebar Toggle Button (shown when sidebar is closed) */}
       {!sidebarOpen && onToggleSidebar && (
-        <div className="absolute top-4 left-4">
+        <div className="absolute top-4 left-4 z-10">
           <Button
             onClick={onToggleSidebar}
             variant="default"
@@ -518,8 +518,8 @@ export default function MapContainer({
         </div>
       )}
 
-      {/* Map Controls */}
-      <div className="absolute top-4 right-4 space-y-2">
+      {/* Map Controls - Hidden on mobile to avoid blocking interface */}
+      <div className="absolute top-4 right-4 space-y-2 hidden md:block">
         <Card className="map-controls p-2 space-y-1">
           <Button
             variant="ghost"
@@ -537,19 +537,12 @@ export default function MapContainer({
           >
             <Trash2 className="h-4 w-4" />
           </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            title="Toggle Layers"
-          >
-            <Layers className="h-4 w-4" />
-          </Button>
         </Card>
       </div>
 
-      {/* Route Legend */}
+      {/* Route Legend - Positioned to avoid mobile interference */}
       {showLegend && (
-        <Card className="absolute bottom-4 left-4 route-legend p-4">
+        <Card className="absolute bottom-4 left-4 route-legend p-4 max-w-xs">
           <h3 className="text-sm font-semibold text-gray-900 mb-2">
             Route Legend
           </h3>
@@ -574,12 +567,7 @@ export default function MapContainer({
         </Card>
       )}
 
-      {/* Coordinates Display */}
-      <Card className="absolute bottom-4 right-4 px-3 py-2">
-        <div className="text-sm text-gray-600">
-          Lat: {mouseCoords.lat}, Lng: {mouseCoords.lng}
-        </div>
-      </Card>
+      {/* Coordinates Display - Hidden per user request */}
     </div>
   );
 }
