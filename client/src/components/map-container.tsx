@@ -253,56 +253,58 @@ export default function MapContainer({
 
           await featureLayer.load();
           
-          // Convert ArcGIS layer to Leaflet-compatible GeoJSON
-          const query = featureLayer.createQuery();
-          query.outFields = ["*"];
-          query.returnGeometry = true;
+          // Get all features using pagination to bypass 2000 feature limit
+          const allFeatures = [];
+          let offset = 0;
+          const maxRecordCount = 2000;
+          let hasMoreFeatures = true;
           
-          const featureSet = await featureLayer.queryFeatures(query);
+          console.log("Fetching all features with pagination...");
+          
+          while (hasMoreFeatures) {
+            const query = featureLayer.createQuery();
+            query.outFields = ["*"];
+            query.returnGeometry = true;
+            query.resultOffset = offset;
+            query.resultRecordCount = maxRecordCount;
+            
+            const featureSet = await featureLayer.queryFeatures(query);
+            
+            if (featureSet.features.length === 0) {
+              hasMoreFeatures = false;
+            } else {
+              allFeatures.push(...featureSet.features);
+              offset += featureSet.features.length;
+              console.log(`Fetched ${featureSet.features.length} features, total: ${allFeatures.length}`);
+              
+              // If we got less than the max, we've reached the end
+              if (featureSet.features.length < maxRecordCount) {
+                hasMoreFeatures = false;
+              }
+            }
+          }
+          
+          console.log(`Total features loaded: ${allFeatures.length}`);
+          
+          // Create a synthetic featureSet object with all features
+          const completeFeatureSet = {
+            features: allFeatures,
+            fields: [],
+            geometryType: 'esriGeometryPolygon'
+          };
           
           import("leaflet").then((L) => {
-            console.log("Raw feature set:", featureSet);
-            console.log("Features count:", featureSet.features.length);
-            console.log("First feature:", featureSet.features[0]);
+            console.log("Complete feature set:", completeFeatureSet);
+            console.log("Total features count:", completeFeatureSet.features.length);
+            console.log("First feature:", completeFeatureSet.features[0]);
             
-            // Try using the built-in toJSON method first
-            try {
-              const geoJsonData = featureSet.toJSON();
-              console.log("FeatureSet toJSON result:", geoJsonData);
-              
-              if (geoJsonData && geoJsonData.features) {
-                const geoJsonLayer = L.geoJSON(geoJsonData, {
-                  style: {
-                    color: '#ff6b35',
-                    weight: 2,
-                    opacity: 0.8,
-                    fillColor: '#ff6b35',
-                    fillOpacity: 0.3
-                  },
-                  onEachFeature: (feature, layer) => {
-                    if (feature.properties) {
-                      const popupContent = Object.entries(feature.properties)
-                        .filter(([key, value]) => value !== null && value !== undefined)
-                        .map(([key, value]) => `<strong>${key}:</strong> ${value}`)
-                        .join('<br>');
-                      layer.bindPopup(popupContent);
-                    }
-                  }
-                });
-                
-                arcgisLayersRef.current[layerUrl] = geoJsonLayer;
-                geoJsonLayer.addTo(mapInstanceRef.current);
-                return;
-              }
-            } catch (error) {
-              console.error("Error with toJSON method:", error);
-            }
+            // Skip the built-in toJSON method for synthetic featureSet and go directly to manual conversion
             
             // Manual conversion fallback
             try {
               const geoJsonFeatures = [];
               
-              featureSet.features.forEach((feature, index) => {
+              completeFeatureSet.features.forEach((feature, index) => {
                 try {
                   if (feature.geometry) {
                     // Get the geometry as JSON and convert from ArcGIS to GeoJSON format
