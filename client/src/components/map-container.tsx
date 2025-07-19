@@ -305,7 +305,7 @@ export default function MapContainer({
               featureSet.features.forEach((feature, index) => {
                 try {
                   if (feature.geometry) {
-                    // Get the geometry as JSON and validate it
+                    // Get the geometry as JSON and convert from ArcGIS to GeoJSON format
                     const geometryJson = feature.geometry.toJSON();
                     
                     // Log first few geometries to understand structure
@@ -313,16 +313,53 @@ export default function MapContainer({
                       console.log(`Sample geometry ${index}:`, geometryJson);
                     }
                     
-                    // Validate that it has required GeoJSON properties
-                    if (geometryJson && geometryJson.type && geometryJson.coordinates) {
+                    // Convert ArcGIS polygon format to GeoJSON format
+                    let geoJsonGeometry = null;
+                    
+                    if (geometryJson && geometryJson.rings && Array.isArray(geometryJson.rings)) {
+                      // ArcGIS Polygon with rings -> GeoJSON Polygon
+                      geoJsonGeometry = {
+                        type: "Polygon",
+                        coordinates: geometryJson.rings
+                      };
+                    } else if (geometryJson && geometryJson.paths && Array.isArray(geometryJson.paths)) {
+                      // ArcGIS Polyline with paths -> GeoJSON LineString/MultiLineString
+                      if (geometryJson.paths.length === 1) {
+                        geoJsonGeometry = {
+                          type: "LineString",
+                          coordinates: geometryJson.paths[0]
+                        };
+                      } else {
+                        geoJsonGeometry = {
+                          type: "MultiLineString",
+                          coordinates: geometryJson.paths
+                        };
+                      }
+                    } else if (geometryJson && geometryJson.x !== undefined && geometryJson.y !== undefined) {
+                      // ArcGIS Point -> GeoJSON Point
+                      geoJsonGeometry = {
+                        type: "Point",
+                        coordinates: [geometryJson.x, geometryJson.y]
+                      };
+                    } else if (geometryJson && geometryJson.type && geometryJson.coordinates) {
+                      // Already in GeoJSON format
+                      geoJsonGeometry = geometryJson;
+                    }
+                    
+                    if (geoJsonGeometry) {
                       const geoJsonFeature = {
                         type: "Feature",
-                        geometry: geometryJson,
+                        geometry: geoJsonGeometry,
                         properties: feature.attributes || {}
                       };
                       geoJsonFeatures.push(geoJsonFeature);
+                      
+                      // Log successful conversion for first few features
+                      if (index < 3) {
+                        console.log(`Converted geometry ${index}:`, geoJsonGeometry);
+                      }
                     } else {
-                      console.warn(`Invalid geometry for feature ${index}:`, geometryJson);
+                      console.warn(`Could not convert geometry for feature ${index}:`, geometryJson);
                     }
                   }
                 } catch (featureError) {
