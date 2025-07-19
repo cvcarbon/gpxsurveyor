@@ -39,7 +39,7 @@ export default function BasicMap({
           throw new Error('Esri API not loaded');
         }
 
-        const [Map, MapView, Sketch, GraphicsLayer, Graphic, SimpleLineSymbol, SimpleMarkerSymbol] = await new Promise((resolve, reject) => {
+        const [Map, MapView, Sketch, GraphicsLayer, Graphic, SimpleLineSymbol, SimpleMarkerSymbol, FeatureLayer] = await new Promise((resolve, reject) => {
           (window as any).require([
             "esri/Map",
             "esri/views/MapView",
@@ -47,7 +47,8 @@ export default function BasicMap({
             "esri/layers/GraphicsLayer",
             "esri/Graphic",
             "esri/symbols/SimpleLineSymbol",
-            "esri/symbols/SimpleMarkerSymbol"
+            "esri/symbols/SimpleMarkerSymbol",
+            "esri/layers/FeatureLayer"
           ], (...modules: any[]) => {
             resolve(modules);
           }, (error: any) => {
@@ -55,13 +56,31 @@ export default function BasicMap({
           });
         });
 
+        // Create feature layers for lease boundaries and bedding documentation
+        const leaseBoundariesLayer = new (FeatureLayer as any)({
+          url: "https://services.arcgis.com/W1AXaDPef2QMa9kU/arcgis/rest/services/Lease_Boundaries/FeatureServer/0",
+          title: "Lease Boundaries",
+          opacity: 0.7,
+          outFields: ["*"]
+        });
+
+        const beddingDocumentationLayer = new (FeatureLayer as any)({
+          url: "https://services.arcgis.com/W1AXaDPef2QMa9kU/arcgis/rest/services/Bedding_Documentation_view/FeatureServer/0",
+          title: "Bedding Documentation", 
+          opacity: 0.8,
+          outFields: ["*"]
+        });
+
+        // Log layer loading
+        console.log("Loading Lease Boundaries and Bedding Documentation layers...");
+
         // Create graphics layers for drawing and routes
         const graphicsLayer = new (GraphicsLayer as any)();
         const routeGraphicsLayer = new (GraphicsLayer as any)();
         
         const map = new (Map as any)({
           basemap: "satellite",
-          layers: [graphicsLayer, routeGraphicsLayer]
+          layers: [leaseBoundariesLayer, beddingDocumentationLayer, graphicsLayer, routeGraphicsLayer]
         });
 
         view = new (MapView as any)({
@@ -116,6 +135,18 @@ export default function BasicMap({
         });
 
         await view.when();
+        
+        // Wait for layers to load
+        try {
+          await Promise.all([
+            leaseBoundariesLayer.when(),
+            beddingDocumentationLayer.when()
+          ]);
+          console.log("All layers loaded successfully");
+        } catch (layerError) {
+          console.warn("Some layers failed to load:", layerError);
+        }
+        
         console.log("Basic map initialized successfully");
         setMapView(view);
         setSketch(sketchWidget);
