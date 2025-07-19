@@ -193,9 +193,9 @@ export default function PolygonInput({
               </div>
               <div className="text-sm text-blue-600 space-y-1">
                 <p>1. Click "Start Drawing" button below</p>
-                <p>2. Click points on the map to define your polygon</p>
-                <p>3. Click "Complete" when you have at least 3 points</p>
-                <p>4. Click "Cancel" to start over if needed</p>
+                <p>2. Use the polygon tool that appears in the top-left</p>
+                <p>3. Click points on the map to define your survey area</p>
+                <p>4. Double-click to complete the polygon</p>
               </div>
             </div>
 
