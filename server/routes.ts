@@ -132,8 +132,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
 // Route generation algorithm
 async function generateTransectRoute(polygon: any, parameters: any) {
   try {
-    // Convert polygon to Turf.js format
-    const polygonFeature = turf.polygon(polygon.geometry.coordinates);
+    console.log("Starting route generation with:");
+    console.log("Polygon:", JSON.stringify(polygon, null, 2));
+    console.log("Parameters:", JSON.stringify(parameters, null, 2));
+    // Convert polygon to Turf feature if needed
+    let polygonFeature;
+    console.log("Processing polygon type:", polygon?.type);
+    
+    if (polygon?.type === 'Polygon') {
+      console.log("Creating polygon from coordinates");
+      polygonFeature = turf.polygon(polygon.coordinates);
+    } else if (polygon?.type === 'Feature' && polygon?.geometry?.type === 'Polygon') {
+      console.log("Using existing feature polygon");
+      polygonFeature = polygon;
+    } else {
+      console.error("Invalid polygon format. Received:", polygon);
+      throw new Error(`Invalid polygon format: expected Polygon or Feature, got ${polygon?.type}`);
+    }
+    
+    console.log("Polygon feature created successfully");
     
     // Calculate bounding box
     const bbox = turf.bbox(polygonFeature);
@@ -374,7 +391,10 @@ async function generateTransectRoute(polygon: any, parameters: any) {
     
   } catch (error) {
     console.error("Error generating transect route:", error);
-    throw new Error("Failed to generate transect route");
+    console.error("Stack trace:", error.stack);
+    console.error("Input polygon:", JSON.stringify(polygon, null, 2));
+    console.error("Input parameters:", JSON.stringify(parameters, null, 2));
+    throw new Error(`Failed to generate transect route: ${error.message}`);
   }
 }
 
