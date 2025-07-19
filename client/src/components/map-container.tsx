@@ -304,15 +304,26 @@ export default function MapContainer({
               
               featureSet.features.forEach((feature, index) => {
                 try {
-                  console.log(`Processing feature ${index}:`, feature);
-                  
                   if (feature.geometry) {
-                    const geoJsonFeature = {
-                      type: "Feature",
-                      geometry: feature.geometry.toJSON(),
-                      properties: feature.attributes || {}
-                    };
-                    geoJsonFeatures.push(geoJsonFeature);
+                    // Get the geometry as JSON and validate it
+                    const geometryJson = feature.geometry.toJSON();
+                    
+                    // Log first few geometries to understand structure
+                    if (index < 3) {
+                      console.log(`Sample geometry ${index}:`, geometryJson);
+                    }
+                    
+                    // Validate that it has required GeoJSON properties
+                    if (geometryJson && geometryJson.type && geometryJson.coordinates) {
+                      const geoJsonFeature = {
+                        type: "Feature",
+                        geometry: geometryJson,
+                        properties: feature.attributes || {}
+                      };
+                      geoJsonFeatures.push(geoJsonFeature);
+                    } else {
+                      console.warn(`Invalid geometry for feature ${index}:`, geometryJson);
+                    }
                   }
                 } catch (featureError) {
                   console.error(`Error processing feature ${index}:`, featureError);
@@ -320,12 +331,25 @@ export default function MapContainer({
               });
               
               if (geoJsonFeatures.length > 0) {
+                console.log(`Successfully converted ${geoJsonFeatures.length} features`);
+                console.log("Sample converted feature:", geoJsonFeatures[0]);
+                
                 const geoJsonCollection = {
                   type: "FeatureCollection",
                   features: geoJsonFeatures
                 };
                 
-                console.log("Manual conversion result:", geoJsonCollection);
+                // Validate the collection structure
+                const isValidCollection = geoJsonCollection.type === "FeatureCollection" && 
+                                        Array.isArray(geoJsonCollection.features) &&
+                                        geoJsonFeatures.every(f => f.type === "Feature" && f.geometry && f.properties);
+                
+                console.log("Collection is valid:", isValidCollection);
+                
+                if (!isValidCollection) {
+                  console.error("Invalid GeoJSON collection structure");
+                  return;
+                }
                 
                 const geoJsonLayer = L.geoJSON(geoJsonCollection, {
                   style: {
