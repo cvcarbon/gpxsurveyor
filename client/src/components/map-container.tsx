@@ -261,43 +261,99 @@ export default function MapContainer({
           const featureSet = await featureLayer.queryFeatures(query);
           
           import("leaflet").then((L) => {
-            // Convert ArcGIS features to proper GeoJSON
-            const geoJsonFeatures = featureSet.features.map(feature => {
-              return {
-                type: "Feature",
-                geometry: feature.geometry.toJSON(),
-                properties: feature.attributes || {}
-              };
-            });
+            console.log("Raw feature set:", featureSet);
+            console.log("Features count:", featureSet.features.length);
+            console.log("First feature:", featureSet.features[0]);
             
-            const geoJsonCollection = {
-              type: "FeatureCollection",
-              features: geoJsonFeatures
-            };
-            
-            console.log("Converted GeoJSON:", geoJsonCollection);
-            
-            const geoJsonLayer = L.geoJSON(geoJsonCollection, {
-              style: {
-                color: '#ff6b35',
-                weight: 2,
-                opacity: 0.8,
-                fillColor: '#ff6b35',
-                fillOpacity: 0.3
-              },
-              onEachFeature: (feature, layer) => {
-                if (feature.properties) {
-                  const popupContent = Object.entries(feature.properties)
-                    .filter(([key, value]) => value !== null && value !== undefined)
-                    .map(([key, value]) => `<strong>${key}:</strong> ${value}`)
-                    .join('<br>');
-                  layer.bindPopup(popupContent);
-                }
+            // Try using the built-in toJSON method first
+            try {
+              const geoJsonData = featureSet.toJSON();
+              console.log("FeatureSet toJSON result:", geoJsonData);
+              
+              if (geoJsonData && geoJsonData.features) {
+                const geoJsonLayer = L.geoJSON(geoJsonData, {
+                  style: {
+                    color: '#ff6b35',
+                    weight: 2,
+                    opacity: 0.8,
+                    fillColor: '#ff6b35',
+                    fillOpacity: 0.3
+                  },
+                  onEachFeature: (feature, layer) => {
+                    if (feature.properties) {
+                      const popupContent = Object.entries(feature.properties)
+                        .filter(([key, value]) => value !== null && value !== undefined)
+                        .map(([key, value]) => `<strong>${key}:</strong> ${value}`)
+                        .join('<br>');
+                      layer.bindPopup(popupContent);
+                    }
+                  }
+                });
+                
+                arcgisLayersRef.current[layerUrl] = geoJsonLayer;
+                geoJsonLayer.addTo(mapInstanceRef.current);
+                return;
               }
-            });
+            } catch (error) {
+              console.error("Error with toJSON method:", error);
+            }
             
-            arcgisLayersRef.current[layerUrl] = geoJsonLayer;
-            geoJsonLayer.addTo(mapInstanceRef.current);
+            // Manual conversion fallback
+            try {
+              const geoJsonFeatures = [];
+              
+              featureSet.features.forEach((feature, index) => {
+                try {
+                  console.log(`Processing feature ${index}:`, feature);
+                  
+                  if (feature.geometry) {
+                    const geoJsonFeature = {
+                      type: "Feature",
+                      geometry: feature.geometry.toJSON(),
+                      properties: feature.attributes || {}
+                    };
+                    geoJsonFeatures.push(geoJsonFeature);
+                  }
+                } catch (featureError) {
+                  console.error(`Error processing feature ${index}:`, featureError);
+                }
+              });
+              
+              if (geoJsonFeatures.length > 0) {
+                const geoJsonCollection = {
+                  type: "FeatureCollection",
+                  features: geoJsonFeatures
+                };
+                
+                console.log("Manual conversion result:", geoJsonCollection);
+                
+                const geoJsonLayer = L.geoJSON(geoJsonCollection, {
+                  style: {
+                    color: '#ff6b35',
+                    weight: 2,
+                    opacity: 0.8,
+                    fillColor: '#ff6b35',
+                    fillOpacity: 0.3
+                  },
+                  onEachFeature: (feature, layer) => {
+                    if (feature.properties) {
+                      const popupContent = Object.entries(feature.properties)
+                        .filter(([key, value]) => value !== null && value !== undefined)
+                        .map(([key, value]) => `<strong>${key}:</strong> ${value}`)
+                        .join('<br>');
+                      layer.bindPopup(popupContent);
+                    }
+                  }
+                });
+                
+                arcgisLayersRef.current[layerUrl] = geoJsonLayer;
+                geoJsonLayer.addTo(mapInstanceRef.current);
+              } else {
+                console.error("No valid features found");
+              }
+            } catch (error) {
+              console.error("Manual conversion failed:", error);
+            }
           });
 
         } catch (error) {
