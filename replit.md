@@ -124,7 +124,7 @@ NODE_ENV=production|development
 - July 07, 2025. Completed curved U-turn implementation following Python reference algorithm with proper point alignment and bearing-specific turn direction handling
 - July 07, 2025. Added waypoints along transect lines for smooth autopilot tracking and line extension logic to prevent reverse movement
 - July 07, 2025. Updated housekeeping: removed test polygon button, changed default map view to Galveston Bay TX, implemented custom filename format {route name}_{bearing}d_{distance}m
-- July 19, 2025. Added default BOEM/BSEE Esri REST service layers (Lease Boundaries and Infrastructure) with automatic authentication handling
+- July 19, 2025. Integrated two specific Esri REST FeatureServer layers directly into map: Lease Boundaries and Bedding Documentation with automatic authentication prompting
 
 ## User Preferences
 

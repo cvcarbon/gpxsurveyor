@@ -4,15 +4,6 @@ import { Card } from "@/components/ui/card";
 import { Expand, Trash2, Layers, ZoomIn, ZoomOut, Menu } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-interface EsriLayer {
-  id: string;
-  name: string;
-  url: string;
-  visible: boolean;
-  authenticated: boolean;
-  error?: string;
-}
-
 interface MapContainerProps {
   polygon: any;
   onPolygonChange: (polygon: any) => void;
@@ -21,7 +12,6 @@ interface MapContainerProps {
   drawingMode?: boolean;
   onDrawingModeChange?: (mode: boolean) => void;
   onToggleSidebar?: () => void;
-  esriLayers?: EsriLayer[];
 }
 
 export default function MapContainer({
@@ -32,7 +22,6 @@ export default function MapContainer({
   drawingMode = false,
   onDrawingModeChange,
   onToggleSidebar,
-  esriLayers = [],
 }: MapContainerProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
@@ -40,7 +29,7 @@ export default function MapContainer({
   const routeLayerRef = useRef<any>(null);
   const drawControlRef = useRef<any>(null);
   const drawnItemsRef = useRef<any>(null);
-  const esriLayersRef = useRef<Map<string, any>>(new Map());
+  const esriLayersRef = useRef<any[]>([]);
   const [mouseCoords, setMouseCoords] = useState({ lat: 29.3013, lng: -94.7977 });
   const [showLegend, setShowLegend] = useState(false);
 
@@ -136,7 +125,64 @@ export default function MapContainer({
           });
         });
 
+        // Add Esri REST service layers automatically
+        import("esri-leaflet").then((esriLeaflet) => {
+          console.log("Loading Lease Boundaries and Infrastructure layers...");
+          
+          // Lease Boundaries layer
+          const leaseBoundariesLayer = esriLeaflet.featureLayer({
+            url: "https://services.arcgis.com/W1AXaDPef2QMa9kU/arcgis/rest/services/Lease_Boundaries_Leasee_View/FeatureServer/0",
+            style: {
+              color: '#ff7800',
+              weight: 2,
+              opacity: 0.8,
+              fillOpacity: 0.3
+            }
+          });
+
+          // Infrastructure/Bedding Documentation layer
+          const beddingDocLayer = esriLeaflet.featureLayer({
+            url: "https://services.arcgis.com/W1AXaDPef2QMa9kU/arcgis/rest/services/Bedding_Documentation_view/FeatureServer/0",
+            style: {
+              color: '#0078ff',
+              weight: 2,
+              opacity: 0.8,
+              fillOpacity: 0.3
+            }
+          });
+
+          // Handle authentication for both layers
+          [leaseBoundariesLayer, beddingDocLayer].forEach((layer, index) => {
+            const layerName = index === 0 ? 'Lease Boundaries' : 'Bedding Documentation';
+            
+            layer.on('loading', () => {
+              console.log(`Loading ${layerName} layer...`);
+            });
+
+            layer.on('load', () => {
+              console.log(`${layerName} layer loaded successfully`);
+            });
+
+            layer.on('requesterror', (error: any) => {
+              console.error(`${layerName} layer error:`, error);
+              if (error.code === 499 || error.code === 403) {
+                console.log(`Authentication required for ${layerName}`);
+                // Browser will automatically prompt for authentication
+              }
+            });
+
+            // Add layer to map
+            layer.addTo(map);
+            esriLayersRef.current.push(layer);
+          });
+
+          console.log("All layers loaded successfully");
+        }).catch((error) => {
+          console.error('Error loading esri-leaflet:', error);
+        });
+
         mapInstanceRef.current = map;
+        console.log("Basic map initialized successfully");
       });
     }
 
@@ -147,71 +193,6 @@ export default function MapContainer({
       }
     };
   }, []);
-
-  // Handle Esri layers
-  useEffect(() => {
-    if (mapInstanceRef.current && typeof window !== "undefined") {
-      import("esri-leaflet").then((esriLeaflet) => {
-        // Remove layers that are no longer in the list
-        esriLayersRef.current.forEach((layer, layerId) => {
-          if (!esriLayers.find(l => l.id === layerId)) {
-            mapInstanceRef.current.removeLayer(layer);
-            esriLayersRef.current.delete(layerId);
-          }
-        });
-
-        // Add or update layers
-        esriLayers.forEach((layerConfig) => {
-          const existingLayer = esriLayersRef.current.get(layerConfig.id);
-          
-          if (existingLayer) {
-            // Update visibility
-            if (layerConfig.visible && !mapInstanceRef.current.hasLayer(existingLayer)) {
-              mapInstanceRef.current.addLayer(existingLayer);
-            } else if (!layerConfig.visible && mapInstanceRef.current.hasLayer(existingLayer)) {
-              mapInstanceRef.current.removeLayer(existingLayer);
-            }
-          } else if (layerConfig.visible) {
-            // Create new layer
-            try {
-              const esriLayer = esriLeaflet.dynamicMapLayer({
-                url: layerConfig.url,
-                opacity: 0.8,
-              });
-
-              // Handle authentication and loading
-              esriLayer.on('requesterror', (error: any) => {
-                console.error('Esri layer error:', error);
-                if (error.code === 499 || error.code === 403) {
-                  console.log('Authentication required for layer:', layerConfig.name);
-                  // Browser will handle authentication dialog automatically
-                }
-              });
-
-              esriLayer.on('load', () => {
-                console.log('Esri layer loaded successfully:', layerConfig.name);
-              });
-
-              esriLayer.on('loading', () => {
-                console.log('Loading', layerConfig.name, 'layer...');
-              });
-
-              esriLayer.on('load', () => {
-                console.log('Layer loaded:', layerConfig.name);
-              });
-
-              esriLayersRef.current.set(layerConfig.id, esriLayer);
-              esriLayer.addTo(mapInstanceRef.current);
-            } catch (error) {
-              console.error('Error creating Esri layer:', error);
-            }
-          }
-        });
-      }).catch((error) => {
-        console.error('Error loading esri-leaflet:', error);
-      });
-    }
-  }, [esriLayers]);
 
   // Update map when polygon changes
   useEffect(() => {
