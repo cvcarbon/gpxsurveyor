@@ -58,14 +58,33 @@ export default function MapSettings({ onSettingsChange }: MapSettingsProps) {
             </div>
           </div>
           
-          <Button 
-            onClick={handleSave}
-            size="sm"
-            className="w-full"
-          >
-            <Save className="h-4 w-4 mr-2" />
-            Save Settings
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              onClick={handleSave}
+              size="sm"
+              className="flex-1"
+            >
+              <Save className="h-4 w-4 mr-2" />
+              Save Settings
+            </Button>
+            <Button 
+              onClick={() => {
+                localStorage.removeItem('arcgis_token');
+                window.location.reload();
+              }}
+              variant="outline"
+              size="sm"
+              className="flex-1"
+            >
+              Clear Auth
+            </Button>
+          </div>
+          
+          {localStorage.getItem('arcgis_token') && (
+            <p className="text-xs text-green-600">
+              ✓ Authentication token stored
+            </p>
+          )}
         </CardContent>
       )}
     </Card>

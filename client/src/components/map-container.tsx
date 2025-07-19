@@ -190,80 +190,73 @@ Click OK to continue to sign in.`);
             return;
           }
 
-          // If we have a token, create authenticated layers
-          if (currentToken) {
-            console.log("Using stored authentication token for layers");
-            
-            layerConfigs.forEach((config) => {
-              const layer = esriLeaflet.featureLayer({
-                url: config.url,
-                token: currentToken,
-                style: {
-                  color: config.color,
-                  weight: 2,
-                  opacity: 0.8,
-                  fillOpacity: 0.3
-                }
-              });
+          // Alternative approach: Try to load layers and handle auth inline
+          console.log("Attempting to load secured layers...");
+          
+          layerConfigs.forEach((config) => {
+            // First try: load with token if available
+            const layerOptions: any = {
+              url: config.url,
+              style: {
+                color: config.color,
+                weight: 2,
+                opacity: 0.8,
+                fillOpacity: 0.3
+              },
+              // Add where clause to limit initial load
+              where: "1=1"
+            };
 
-              layer.on('loading', () => {
-                console.log(`Loading ${config.name} features with token...`);
-              });
+            if (currentToken) {
+              layerOptions.token = currentToken;
+              console.log(`Trying ${config.name} with stored token`);
+            }
 
-              layer.on('load', () => {
-                console.log(`${config.name} authenticated layer loaded successfully`);
-              });
+            const layer = esriLeaflet.featureLayer(layerOptions);
 
-              layer.on('addfeature', (e: any) => {
-                console.log(`${config.name} - Feature added:`, e.feature.properties);
-              });
+            let featureLoadAttempted = false;
 
-              layer.on('requesterror', (error: any) => {
-                console.error(`${config.name} authenticated request failed:`, error);
-                // Clear invalid token and retry
-                localStorage.removeItem('arcgis_token');
-                showAuthPrompt();
-              });
-
-              layer.addTo(map);
-              esriLayersRef.current.push(layer);
+            layer.on('loading', () => {
+              console.log(`Loading ${config.name} features...`);
             });
-          } else {
-            // No token - show placeholder layers that will trigger auth
-            console.log("No token available - creating placeholder layers");
-            
-            layerConfigs.forEach((config) => {
-              // Test the endpoint first
-              fetch(`${config.url}?f=json`)
-                .then(response => response.json())
-                .then(data => {
-                  if (data.error && (data.error.code === 499 || data.error.code === 403 || data.error.code === 401)) {
-                    console.log(`${config.name} requires authentication - prompting user`);
-                    if (!authPromptShown) {
+
+            layer.on('load', () => {
+              console.log(`${config.name} layer connected`);
+              if (!featureLoadAttempted) {
+                featureLoadAttempted = true;
+                // Try to query features to test authentication
+                layer.query().run((error: any, featureCollection: any) => {
+                  if (error) {
+                    console.error(`${config.name} query failed:`, error);
+                    if ((error.code === 499 || error.code === 403 || error.code === 401) && !authPromptShown) {
+                      console.log(`${config.name} needs authentication`);
                       showAuthPrompt();
                     }
                   } else {
-                    console.log(`${config.name} service info:`, data);
-                    // Create the layer if no auth needed
-                    const layer = esriLeaflet.featureLayer({
-                      url: config.url,
-                      style: {
-                        color: config.color,
-                        weight: 2,
-                        opacity: 0.8,
-                        fillOpacity: 0.3
-                      }
-                    });
-
-                    layer.addTo(map);
-                    esriLayersRef.current.push(layer);
+                    const featureCount = featureCollection?.features?.length || 0;
+                    console.log(`${config.name} loaded ${featureCount} features successfully`);
+                    if (featureCount > 0) {
+                      console.log(`First feature from ${config.name}:`, featureCollection.features[0]);
+                    }
                   }
-                })
-                .catch(error => {
-                  console.error(`Error testing ${config.name}:`, error);
                 });
+              }
             });
-          }
+
+            layer.on('addfeature', (e: any) => {
+              console.log(`${config.name} - Feature added to map:`, e.feature.id || 'unnamed');
+            });
+
+            layer.on('requesterror', (error: any) => {
+              console.error(`${config.name} request error:`, error);
+              if ((error.code === 499 || error.code === 403 || error.code === 401) && !authPromptShown) {
+                showAuthPrompt();
+              }
+            });
+
+            layer.addTo(map);
+            esriLayersRef.current.push(layer);
+          });
 
           console.log("All layers initialized");
         }).catch((error) => {
