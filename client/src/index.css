@@ -1,18 +1,28 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 @import url('https://js.arcgis.com/4.28/esri/themes/light/main.css');
 
-/* Esri map styles */
-.esri-view {
-  height: 100% !important;
+/* Esri map container fix */
+.esri-view-root {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
   width: 100% !important;
+  height: 100% !important;
 }
 
-.esri-sketch__panel {
-  background-color: rgba(255, 255, 255, 0.9) !important;
+.esri-view {
+  width: 100% !important;
+  height: 100% !important;
 }
 
 .esri-widget {
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15) !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3) !important;
+}
+
+.esri-sketch__panel {
+  background: rgba(255, 255, 255, 0.95) !important;
 }
 
 @tailwind base;
