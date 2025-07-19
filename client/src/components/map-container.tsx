@@ -504,8 +504,11 @@ export default function MapContainer({
         style={{ minHeight: "100vh" }}
       />
 
-      {/* Sidebar Toggle Button - Always visible with debug styling */}
-      <div className="fixed top-4 left-4 z-[9999] bg-yellow-300 p-1 rounded">
+      {/* Sidebar Toggle Button - Responsive positioning */}
+      <div className={cn(
+        "fixed top-4 z-50 transition-all duration-300",
+        sidebarOpen ? "left-[25rem] md:left-[25rem]" : "left-4"
+      )}>
         <Button
           onClick={() => {
             console.log("Menu button clicked, current sidebar state:", sidebarOpen);
@@ -514,11 +517,11 @@ export default function MapContainer({
             }
           }}
           variant="default"
-          size="lg"
-          className="bg-red-600 hover:bg-red-700 text-white shadow-xl border-4 border-yellow-400"
+          size="icon"
+          className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg"
           title={sidebarOpen ? "Close sidebar" : "Open sidebar"}
         >
-          <Menu className="h-6 w-6" />
+          <Menu className="h-5 w-5" />
         </Button>
       </div>
 

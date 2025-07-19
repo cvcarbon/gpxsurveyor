@@ -43,7 +43,7 @@ export default function Sidebar({
 }: SidebarProps) {
   return (
     <div className={cn(
-      "sidebar-transition w-96 bg-white shadow-xl border-r border-gray-200 flex flex-col fixed left-0 top-0 h-full z-40 md:relative md:z-auto",
+      "sidebar-transition w-96 bg-white shadow-xl border-r border-gray-200 flex flex-col fixed left-0 top-0 h-full z-40 md:relative md:z-auto transition-transform duration-300",
       !open && "-translate-x-full"
     )}>
       {/* Header */}
