@@ -504,25 +504,28 @@ export default function MapContainer({
         style={{ minHeight: "100vh" }}
       />
 
-      {/* Sidebar Toggle Button - Top Right */}
-      <div className="fixed top-4 right-4 z-50">
+      {/* Sidebar Toggle Button - Top Right - Always Visible */}
+      <div className="fixed top-4 right-4 z-[9999] bg-red-500 p-2 rounded">
         <Button
           onClick={() => {
+            console.log("BUTTON CLICKED!");
             if (onToggleSidebar) {
               onToggleSidebar();
+            } else {
+              console.log("onToggleSidebar is not defined");
             }
           }}
           variant="default"
-          size="icon"
-          className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg"
-          title={sidebarOpen ? "Close sidebar" : "Open sidebar"}
+          size="lg"
+          className="bg-yellow-500 hover:bg-yellow-600 text-black shadow-xl border-4 border-black"
+          title="Toggle Sidebar"
         >
-          <Menu className="h-5 w-5" />
+          MENU
         </Button>
       </div>
 
-      {/* Map Controls - Hidden on mobile to avoid blocking interface */}
-      <div className="absolute top-4 right-4 space-y-2 hidden md:block">
+      {/* Map Controls - Moved down to avoid conflict with menu button */}
+      <div className="absolute top-20 right-4 space-y-2 hidden md:block">
         <Card className="map-controls p-2 space-y-1">
           <Button
             variant="ghost"
