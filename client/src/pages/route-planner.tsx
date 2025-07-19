@@ -5,6 +5,15 @@ import MapContainer from "@/components/map-container";
 import { useToast } from "@/hooks/use-toast";
 import { RouteParameters } from "@shared/schema";
 
+interface EsriLayer {
+  id: string;
+  name: string;
+  url: string;
+  visible: boolean;
+  authenticated: boolean;
+  error?: string;
+}
+
 export default function RoutePlanner() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [polygon, setPolygon] = useState<any>(null);
@@ -16,6 +25,7 @@ export default function RoutePlanner() {
   });
   const [generatedRoute, setGeneratedRoute] = useState<any>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [esriLayers, setEsriLayers] = useState<EsriLayer[]>([]);
   const { toast } = useToast();
 
   const handlePolygonChange = (newPolygon: any) => {
@@ -63,6 +73,8 @@ export default function RoutePlanner() {
           isGenerating={isGenerating}
           onRouteGenerated={handleRouteGenerated}
           onError={handleError}
+          esriLayers={esriLayers}
+          onEsriLayersChange={setEsriLayers}
         />
         
         <div className="flex-1 relative">
@@ -72,6 +84,7 @@ export default function RoutePlanner() {
             generatedRoute={generatedRoute}
             sidebarOpen={sidebarOpen}
             onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+            esriLayers={esriLayers}
           />
         </div>
       </div>

@@ -6,8 +6,18 @@ import PolygonInput from "./polygon-input";
 import RouteParameters from "./route-parameters";
 import RouteGeneration from "./route-generation";
 import ExportOptions from "./export-options";
+import EsriLayersControl from "./esri-layers-control";
 import { RouteParameters as RouteParametersType } from "@shared/schema";
 import { cn } from "@/lib/utils";
+
+interface EsriLayer {
+  id: string;
+  name: string;
+  url: string;
+  visible: boolean;
+  authenticated: boolean;
+  error?: string;
+}
 
 interface SidebarProps {
   open: boolean;
@@ -20,6 +30,8 @@ interface SidebarProps {
   isGenerating: boolean;
   onRouteGenerated: (route: any) => void;
   onError: (error: string) => void;
+  esriLayers: EsriLayer[];
+  onEsriLayersChange: (layers: EsriLayer[]) => void;
 }
 
 export default function Sidebar({
@@ -33,6 +45,8 @@ export default function Sidebar({
   isGenerating,
   onRouteGenerated,
   onError,
+  esriLayers,
+  onEsriLayersChange,
 }: SidebarProps) {
   return (
     <div className={cn(
@@ -56,6 +70,10 @@ export default function Sidebar({
           polygon={polygon}
           onPolygonChange={onPolygonChange}
           onError={onError}
+        />
+
+        <EsriLayersControl
+          onLayersChange={onEsriLayersChange}
         />
         
         <RouteParameters
