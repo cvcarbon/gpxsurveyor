@@ -49,6 +49,13 @@ export default function MapSettings({ onSettingsChange }: MapSettingsProps) {
             <p className="text-xs text-gray-500">
               Required to access secure map layers. Get this from your ArcGIS Developers account.
             </p>
+            <div className="p-2 bg-blue-50 rounded text-xs text-blue-800">
+              <strong>Redirect URI to configure:</strong>
+              <br />
+              <code className="bg-white px-1 py-0.5 rounded text-xs">
+                {window.location.origin + window.location.pathname}
+              </code>
+            </div>
           </div>
           
           <Button 

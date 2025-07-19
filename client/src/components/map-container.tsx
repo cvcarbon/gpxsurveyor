@@ -156,11 +156,21 @@ export default function MapContainer({
                 return;
               }
               
-              const userConfirm = confirm("These map layers require ArcGIS authentication. Click OK to sign in, then you'll be redirected back here.");
+              const currentUrl = window.location.origin + window.location.pathname;
+              console.log("Current URL for redirect:", currentUrl);
+              
+              const userConfirm = confirm(`These map layers require ArcGIS authentication. 
+
+IMPORTANT: Make sure your ArcGIS app has this redirect URI configured:
+${currentUrl}
+
+Click OK to continue to sign in.`);
+              
               if (userConfirm) {
-                const redirectUri = encodeURIComponent(window.location.origin + window.location.pathname);
+                const redirectUri = encodeURIComponent(currentUrl);
                 const authUrl = `https://www.arcgis.com/sharing/rest/oauth2/authorize?client_id=${clientId}&response_type=token&expiration=1440&redirect_uri=${redirectUri}`;
                 console.log("Opening authentication URL:", authUrl);
+                console.log("Make sure this redirect URI is configured in your ArcGIS app:", currentUrl);
                 window.location.href = authUrl;
               }
             }
