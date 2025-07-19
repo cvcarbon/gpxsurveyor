@@ -25,6 +25,7 @@ export default function BasicMap({
   const [sketch, setSketch] = useState<any>(null);
   const [mapView, setMapView] = useState<any>(null);
   const [routeLayer, setRouteLayer] = useState<any>(null);
+  const [graphicsLayer, setGraphicsLayer] = useState<any>(null);
   const [showWaypoints, setShowWaypoints] = useState(false);
 
   useEffect(() => {
@@ -151,6 +152,7 @@ export default function BasicMap({
         setMapView(view);
         setSketch(sketchWidget);
         setRouteLayer(routeGraphicsLayer);
+        setGraphicsLayer(graphicsLayer);
         setMapReady(true);
         setError("");
 
@@ -328,9 +330,8 @@ export default function BasicMap({
       }
       setIsDrawing(false);
     } else {
-      // Start drawing
-      const graphicsLayer = mapView.map.layers.getItemAt(0);
-      if (graphicsLayer) {
+      // Start drawing - clear existing graphics
+      if (graphicsLayer && graphicsLayer.removeAll) {
         graphicsLayer.removeAll();
       }
       
