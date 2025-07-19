@@ -259,14 +259,14 @@ export default function MapContainer({
           const totalCount = await featureLayer.queryFeatureCount(countQuery);
           console.log(`Total features in layer: ${totalCount}`);
           
-          // Proper pagination to get all features
-          const allFeatures = [];
+          // Use a Set to track unique feature IDs and avoid duplicates
+          const uniqueFeatures = new Map();
           const batchSize = 2000;
           let currentOffset = 0;
           
-          console.log("Fetching all features with proper pagination...");
+          console.log("Fetching all features with duplicate detection...");
           
-          // Calculate how many batches we need
+          // Calculate how many batches we need based on total count
           const totalBatches = Math.ceil(totalCount / batchSize);
           console.log(`Need ${totalBatches} batches to get all ${totalCount} features`);
           
@@ -288,14 +288,22 @@ export default function MapContainer({
                 break;
               }
               
-              allFeatures.push(...batchFeatures);
+              // Add features to map, checking for duplicates
+              let newFeaturesCount = 0;
+              batchFeatures.forEach(feature => {
+                const featureId = feature.attributes.OBJECTID || feature.attributes.OBJECTID_1 || feature.uid;
+                if (!uniqueFeatures.has(featureId)) {
+                  uniqueFeatures.set(featureId, feature);
+                  newFeaturesCount++;
+                }
+              });
+              
               currentOffset += batchFeatures.length;
+              console.log(`Batch ${batch + 1}: got ${batchFeatures.length} features, ${newFeaturesCount} new, total unique: ${uniqueFeatures.size}/${totalCount}`);
               
-              console.log(`Batch ${batch + 1}: got ${batchFeatures.length} features, total: ${allFeatures.length}/${totalCount}`);
-              
-              // If this batch was smaller than expected, we're done
-              if (batchFeatures.length < batchSize) {
-                console.log("Partial batch received, all features loaded");
+              // Stop if we have all unique features or if we're not getting new ones
+              if (uniqueFeatures.size >= totalCount || newFeaturesCount === 0) {
+                console.log("All unique features collected");
                 break;
               }
               
@@ -304,6 +312,9 @@ export default function MapContainer({
               break;
             }
           }
+          
+          // Convert map values back to array
+          const allFeatures = Array.from(uniqueFeatures.values());
           
           console.log(`Total features loaded: ${allFeatures.length}`);
           
