@@ -59,7 +59,7 @@ export default function BasicMap({
 
         // Create feature layers for lease boundaries and bedding documentation
         const leaseBoundariesLayer = new (FeatureLayer as any)({
-          url: "https://services.arcgis.com/W1AXaDPef2QMa9kU/arcgis/rest/services/Lease_Boundaries/FeatureServer/0",
+          url: "https://services.arcgis.com/W1AXaDPef2QMa9kU/arcgis/rest/services/Lease_Boundaries_Leasee_View/FeatureServer/0",
           title: "Lease Boundaries",
           opacity: 0.7,
           outFields: ["*"]
@@ -283,7 +283,11 @@ export default function BasicMap({
 
       // Clean up any existing watcher
       if ((routeLayer as any).zoomHandle) {
-        (routeLayer as any).zoomHandle.remove();
+        try {
+          (routeLayer as any).zoomHandle.remove();
+        } catch (error) {
+          // Ignore cleanup errors during development
+        }
       }
 
       // Store cleanup function
