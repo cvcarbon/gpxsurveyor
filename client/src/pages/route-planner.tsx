@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Helmet } from "react-helmet";
 import Sidebar from "@/components/sidebar";
-import MapContainer from "@/components/esri-map-final";
+import MapContainer from "@/components/map-container";
 import { useToast } from "@/hooks/use-toast";
 import { RouteParameters } from "@shared/schema";
 
@@ -16,7 +16,6 @@ export default function RoutePlanner() {
   });
   const [generatedRoute, setGeneratedRoute] = useState<any>(null);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [drawingMode, setDrawingMode] = useState(false);
   const { toast } = useToast();
 
   const handlePolygonChange = (newPolygon: any) => {
@@ -64,7 +63,6 @@ export default function RoutePlanner() {
           isGenerating={isGenerating}
           onRouteGenerated={handleRouteGenerated}
           onError={handleError}
-          onStartDrawing={() => setDrawingMode(true)}
         />
         
         <div className="flex-1 relative">
@@ -73,8 +71,6 @@ export default function RoutePlanner() {
             onPolygonChange={handlePolygonChange}
             generatedRoute={generatedRoute}
             sidebarOpen={sidebarOpen}
-            drawingMode={drawingMode}
-            onDrawingModeChange={setDrawingMode}
             onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
           />
         </div>

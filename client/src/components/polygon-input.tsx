@@ -192,23 +192,14 @@ export default function PolygonInput({
                 </p>
               </div>
               <div className="text-sm text-blue-600 space-y-1">
-                <p>1. Click "Start Drawing" button below</p>
-                <p>2. Click the polygon tool that appears in the top-left</p>
-                <p>3. Click points on the map to draw your survey area</p>
-                <p>4. Click the first point again to complete the polygon</p>
+                <p>1. Look for the drawing controls on the map (top-left corner)</p>
+                <p>2. Click the polygon tool (square icon)</p>
+                <p>3. Click points on the map to create your survey area</p>
+                <p>4. Double-click to finish the polygon</p>
               </div>
             </div>
 
             <div className="flex space-x-2">
-              <Button
-                variant="default"
-                size="sm"
-                onClick={onStartDrawing}
-                disabled={!onStartDrawing}
-              >
-                <Pencil className="h-4 w-4 mr-2" />
-                Start Drawing
-              </Button>
               <Button
                 variant="outline"
                 size="sm"
