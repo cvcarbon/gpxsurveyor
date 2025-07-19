@@ -127,6 +127,8 @@ ARCGIS_CLIENT_ID=your_arcgis_oauth_app_id # Required for ArcGIS authentication a
 - July 07, 2025. Updated housekeeping: removed test polygon button, changed default map view to Galveston Bay TX, implemented custom filename format {route name}_{bearing}d_{distance}m
 - July 19, 2025. Integrated ArcGIS JavaScript SDK with OAuth authentication for displaying feature layers (lease boundaries) alongside Leaflet map functionality
 - July 19, 2025. Successfully implemented ArcGIS feature layer display with proper geometry conversion from ArcGIS polygon format to GeoJSON, and pagination to load unlimited features beyond the 2000-record limit
+- July 19, 2025. Fixed ArcGIS REST API pagination issues using ObjectID-based queries instead of offset-based pagination, resolving duplicate and missing feature problems
+- July 19, 2025. Added second ArcGIS layer (Bedding Documentation) with distinct styling, removed test components, and set both layers to display by default
 
 ## User Preferences
 

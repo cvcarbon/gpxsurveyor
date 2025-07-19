@@ -232,11 +232,15 @@ export default function MapContainer({
         try {
           const FeatureLayer = (await import("@arcgis/core/layers/FeatureLayer")).default;
           
+          // Determine layer type and styling
+          const isLeaseLayer = layerUrl.includes("Lease_Boundaries");
+          const isBeddingLayer = layerUrl.includes("Bedding_Documentation");
+          
           const featureLayer = new FeatureLayer({
             url: layerUrl,
             outFields: ["*"],
             popupTemplate: {
-              title: "Lease Boundary",
+              title: isLeaseLayer ? "Lease Boundary" : "Bedding Documentation",
               content: [
                 {
                   type: "fields",
@@ -399,14 +403,23 @@ export default function MapContainer({
                   return;
                 }
                 
+                // Different styling for different layers
+                const layerStyle = isLeaseLayer ? {
+                  color: '#ff6b35',
+                  weight: 2,
+                  opacity: 0.8,
+                  fillColor: '#ff6b35',
+                  fillOpacity: 0.3
+                } : {
+                  color: '#3b82f6',
+                  weight: 1,
+                  opacity: 0.7,
+                  fillColor: '#3b82f6',
+                  fillOpacity: 0.2
+                };
+                
                 const geoJsonLayer = L.geoJSON(geoJsonCollection, {
-                  style: {
-                    color: '#ff6b35',
-                    weight: 2,
-                    opacity: 0.8,
-                    fillColor: '#ff6b35',
-                    fillOpacity: 0.3
-                  },
+                  style: layerStyle,
                   onEachFeature: (feature, layer) => {
                     if (feature.properties) {
                       const popupContent = Object.entries(feature.properties)

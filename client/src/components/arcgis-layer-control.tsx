@@ -18,11 +18,17 @@ export default function ArcGISLayerControl({
   const { isAuthenticated } = useArcGISAuth();
   
   const leaseLayerUrl = "https://services.arcgis.com/W1AXaDPef2QMa9kU/arcgis/rest/services/Lease_Boundaries_Leasee_View/FeatureServer/0";
+const beddingLayerUrl = "https://services.arcgis.com/W1AXaDPef2QMa9kU/arcgis/rest/services/Bedding_Documentation_view/FeatureServer/0";
   
-  const isLayerVisible = layerVisibility[leaseLayerUrl] || false;
+  const isLeaseLayerVisible = layerVisibility[leaseLayerUrl] || false;
+  const isBeddingLayerVisible = layerVisibility[beddingLayerUrl] || false;
 
-  const handleToggleLayer = (visible: boolean) => {
+  const handleToggleLeaseLayer = (visible: boolean) => {
     onLayerToggle(leaseLayerUrl, visible);
+  };
+
+  const handleToggleBeddingLayer = (visible: boolean) => {
+    onLayerToggle(beddingLayerUrl, visible);
   };
 
   // Remove authentication requirement since the layer works without it
@@ -58,22 +64,40 @@ export default function ArcGISLayerControl({
             Lease Boundaries
           </Label>
           <div className="flex items-center gap-2">
-            {isLayerVisible ? (
+            {isLeaseLayerVisible ? (
               <Eye className="h-4 w-4 text-green-600" />
             ) : (
               <EyeOff className="h-4 w-4 text-gray-400" />
             )}
             <Switch
               id="lease-boundaries"
-              checked={isLayerVisible}
-              onCheckedChange={handleToggleLayer}
+              checked={isLeaseLayerVisible}
+              onCheckedChange={handleToggleLeaseLayer}
             />
           </div>
         </div>
         
-        {isLayerVisible && (
+        <div className="flex items-center justify-between">
+          <Label htmlFor="bedding-documentation" className="text-sm">
+            Bedding Documentation
+          </Label>
+          <div className="flex items-center gap-2">
+            {isBeddingLayerVisible ? (
+              <Eye className="h-4 w-4 text-green-600" />
+            ) : (
+              <EyeOff className="h-4 w-4 text-gray-400" />
+            )}
+            <Switch
+              id="bedding-documentation"
+              checked={isBeddingLayerVisible}
+              onCheckedChange={handleToggleBeddingLayer}
+            />
+          </div>
+        </div>
+        
+        {(isLeaseLayerVisible || isBeddingLayerVisible) && (
           <div className="text-xs text-muted-foreground">
-            Displaying lease boundaries from ArcGIS feature service
+            Displaying {isLeaseLayerVisible && isBeddingLayerVisible ? 'both layers' : isLeaseLayerVisible ? 'lease boundaries' : 'bedding documentation'} from ArcGIS feature services
           </div>
         )}
       </CardContent>

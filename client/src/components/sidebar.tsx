@@ -8,7 +8,7 @@ import RouteGeneration from "./route-generation";
 import ExportOptions from "./export-options";
 import ArcGISSignIn from "./arcgis-signin";
 import ArcGISLayerControl from "./arcgis-layer-control";
-import ArcGISTest from "./arcgis-test";
+
 import { RouteParameters as RouteParametersType } from "@shared/schema";
 import { cn } from "@/lib/utils";
 
@@ -60,8 +60,6 @@ export default function Sidebar({
       {/* Scrollable Content */}
       <div className="flex-1 overflow-y-auto">
         <div className="p-4 space-y-4">
-          <ArcGISTest />
-          
           <ArcGISSignIn />
           
           {onLayerToggle && (
