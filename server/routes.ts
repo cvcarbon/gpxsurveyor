@@ -208,6 +208,9 @@ async function generateTransectRoute(polygon: any, parameters: any) {
     const transectLines = [];
     const waypoints = [];
     
+    // Calculate bearing in radians (needed for waypoint generation later)
+    const bearingRad = (parameters.bearing * Math.PI) / 180;
+    
     for (let i = 0; i < lineCount; i++) {
       // Calculate offset from center along perpendicular bearing
       const offset = (i - lineCount / 2) * (effectiveDistance / 111000);
@@ -220,8 +223,6 @@ async function generateTransectRoute(polygon: any, parameters: any) {
       // Create a long line along the bearing direction
       const lineLength = diagonal * 2; // Make it long enough to span the polygon
       const lineLengthDegrees = lineLength;
-      
-      const bearingRad = (parameters.bearing * Math.PI) / 180;
       const startX = lineCenter[0] - lineLengthDegrees * Math.cos(bearingRad);
       const startY = lineCenter[1] - lineLengthDegrees * Math.sin(bearingRad);
       const endX = lineCenter[0] + lineLengthDegrees * Math.cos(bearingRad);
