@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ArcGIS OAuth Callback</title>
+</head>
+<body>
+    <script>
+        // ArcGIS OAuth callback page
+        if (window.opener) {
+            window.opener.postMessage({
+                type: 'arcgis-oauth-callback',
+                url: window.location.href
+            }, window.location.origin);
+            window.close();
+        }
+    </script>
+</body>
+</html>

@@ -32,8 +32,8 @@ export function ArcGISAuthProvider({ children }: { children: ReactNode }) {
     const oAuthInfo = new OAuthInfo({
       appId: clientId,
       portalUrl: "https://www.arcgis.com",
-      popup: true, // Use popup for easier authentication
-      flowType: "auto"
+      popup: false, // Use redirect instead of popup
+      flowType: "authorization-code"
     });
 
     IdentityManager.registerOAuthInfos([oAuthInfo]);
@@ -71,7 +71,13 @@ export function ArcGISAuthProvider({ children }: { children: ReactNode }) {
       setIsLoading(true);
       console.log("Attempting to sign in to ArcGIS...");
       
-      const credential = await IdentityManager.getCredential("https://www.arcgis.com");
+      // Try to get credential - this will redirect to ArcGIS login if needed
+      const credential = await IdentityManager.getCredential("https://www.arcgis.com", {
+        error: null,
+        oAuthPopupConfirmation: false,
+        retry: false
+      });
+      
       console.log("Sign in successful, credential received:", credential);
       
       const portalInstance = new Portal({
@@ -86,9 +92,8 @@ export function ArcGISAuthProvider({ children }: { children: ReactNode }) {
       setPortal(portalInstance);
     } catch (error) {
       console.error("Sign in failed:", error);
-      throw error;
-    } finally {
       setIsLoading(false);
+      throw new Error(`Authentication failed: ${error.message || 'Unknown error'}`);
     }
   };
 

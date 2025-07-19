@@ -11,11 +11,16 @@ export default function ArcGISSignIn() {
   const handleSignIn = async () => {
     try {
       setIsSigningIn(true);
+      console.log("Starting sign in process...");
       await signIn();
+      console.log("Sign in completed successfully");
     } catch (error) {
       console.error("Sign in error:", error);
+      // Don't show alert to avoid breaking UI
+      console.log("Sign in failed, will show in UI");
     } finally {
       setIsSigningIn(false);
+      console.log("Sign in process finished");
     }
   };
 
