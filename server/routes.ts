@@ -141,7 +141,32 @@ async function generateTransectRoute(polygon: any, parameters: any) {
     
     if (polygon?.type === 'Polygon') {
       console.log("Creating polygon from coordinates");
-      polygonFeature = turf.polygon(polygon.coordinates);
+      
+      // Check if coordinates are in Web Mercator (large numbers) and convert if needed
+      const firstCoord = polygon.coordinates[0][0];
+      const isWebMercator = Math.abs(firstCoord[0]) > 1000 || Math.abs(firstCoord[1]) > 1000;
+      
+      if (isWebMercator) {
+        console.log("Converting from Web Mercator to WGS84");
+        // Convert Web Mercator (EPSG:3857) to WGS84 (EPSG:4326)
+        const convertedCoordinates = polygon.coordinates.map((ring: number[][]) => 
+          ring.map((coord: number[]) => {
+            const x = coord[0];
+            const y = coord[1];
+            
+            // Web Mercator to WGS84 conversion
+            const lng = (x / 20037508.34) * 180;
+            let lat = (y / 20037508.34) * 180;
+            lat = 180 / Math.PI * (2 * Math.atan(Math.exp(lat * Math.PI / 180)) - Math.PI / 2);
+            
+            return [lng, lat];
+          })
+        );
+        polygonFeature = turf.polygon(convertedCoordinates);
+        console.log("Converted coordinates:", convertedCoordinates[0]);
+      } else {
+        polygonFeature = turf.polygon(polygon.coordinates);
+      }
     } else if (polygon?.type === 'Feature' && polygon?.geometry?.type === 'Polygon') {
       console.log("Using existing feature polygon");
       polygonFeature = polygon;
@@ -168,6 +193,7 @@ async function generateTransectRoute(polygon: any, parameters: any) {
     
     // Generate transect lines based on bearing
     const lineCount = Math.ceil((maxX - minX) / (effectiveDistance / 111000)); // Rough conversion to degrees
+    console.log(`Generated ${lineCount} transect lines with ${effectiveDistance}m spacing`);
     
     // First pass: Generate all transect lines
     for (let i = 0; i < lineCount; i++) {
@@ -379,6 +405,8 @@ async function generateTransectRoute(polygon: any, parameters: any) {
     
     // Estimate time (assuming 5 m/s average speed)
     const estimatedTime = Math.round(totalDistance / 5 / 60);
+    
+    console.log(`Route generation completed: ${transectLines.length} lines, ${waypoints.length} waypoints`);
     
     return {
       transectLines,
