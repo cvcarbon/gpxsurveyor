@@ -253,54 +253,42 @@ export default function MapContainer({
 
           await featureLayer.load();
           
-          // First, get the total count of features to better understand pagination
-          const countQuery = featureLayer.createQuery();
-          countQuery.where = "1=1"; // Get all features
-          const featureCount = await featureLayer.queryFeatureCount(countQuery);
-          console.log(`Total features in layer: ${featureCount}`);
-          
-          // Get all features using pagination to bypass 2000 feature limit
+          // Simplified approach: just get all features with multiple queries
           const allFeatures = [];
           let offset = 0;
-          const maxRecordCount = 2000; // Use server's preferred batch size
-          let hasMoreFeatures = true;
+          let batchSize = 2000;
+          let batchNumber = 1;
           
-          console.log("Fetching all features with pagination...");
+          console.log("Fetching all features using simplified pagination...");
           
-          while (hasMoreFeatures) {
+          // Fetch up to 5 batches (should cover 10,000 features max)
+          for (let i = 0; i < 5; i++) {
             const query = featureLayer.createQuery();
             query.outFields = ["*"];
             query.returnGeometry = true;
             query.resultOffset = offset;
-            query.resultRecordCount = maxRecordCount;
+            query.resultRecordCount = batchSize;
             
+            console.log(`Fetching batch ${batchNumber} (offset: ${offset})...`);
             const featureSet = await featureLayer.queryFeatures(query);
             
-            console.log(`Query result: ${featureSet.features.length} features, exceededTransferLimit: ${featureSet.exceededTransferLimit}`);
+            console.log(`Batch ${batchNumber}: Got ${featureSet.features.length} features`);
             
             if (featureSet.features.length === 0) {
-              hasMoreFeatures = false;
-              console.log("No more features to fetch");
-            } else {
-              allFeatures.push(...featureSet.features);
-              offset += featureSet.features.length;
-              console.log(`Fetched ${featureSet.features.length} features, total: ${allFeatures.length}`);
-              
-              // Stop when we have all features or when we get fewer than expected
-              if (allFeatures.length >= featureCount) {
-                hasMoreFeatures = false;
-                console.log(`Got all features: ${allFeatures.length}/${featureCount}`);
-              } else if (featureSet.features.length < 2000) {
-                // If we get less than 2000, it means we've reached the end
-                hasMoreFeatures = false;
-                console.log(`Reached end with partial batch: ${allFeatures.length}/${featureCount}`);
-              }
-              
-              // Safety check to prevent infinite loops
-              if (allFeatures.length > featureCount + 1000) {
-                console.warn("Safety limit exceeded, stopping pagination");
-                hasMoreFeatures = false;
-              }
+              console.log("No more features available");
+              break;
+            }
+            
+            allFeatures.push(...featureSet.features);
+            offset += featureSet.features.length;
+            batchNumber++;
+            
+            console.log(`Total features so far: ${allFeatures.length}`);
+            
+            // If we got less than the batch size, we're done
+            if (featureSet.features.length < batchSize) {
+              console.log("Got partial batch, stopping");
+              break;
             }
           }
           
