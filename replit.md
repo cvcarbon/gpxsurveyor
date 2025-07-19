@@ -116,6 +116,7 @@ uploaded_files (
 ```
 DATABASE_URL=postgresql://... # Required for database connection
 NODE_ENV=production|development
+VITE_ARCGIS_CLIENT_ID=your_oauth_app_id # Optional: ArcGIS OAuth App ID for authenticated layers
 ```
 
 ## Changelog

@@ -148,9 +148,19 @@ export default function MapContainer({
           const showAuthPrompt = () => {
             if (!authPromptShown) {
               authPromptShown = true;
-              const userConfirm = confirm("These map layers require ArcGIS authentication. Click OK to sign in, then refresh this page after authentication.");
+              // Check for OAuth client ID in environment or prompt user
+              let clientId = import.meta.env.VITE_ARCGIS_CLIENT_ID;
+              
+              if (!clientId) {
+                clientId = prompt("Please enter your ArcGIS OAuth App ID (from your ArcGIS Developer account):");
+                if (!clientId) {
+                  console.log("No OAuth App ID provided, skipping authentication");
+                  return;
+                }
+              }
+              
+              const userConfirm = confirm("These map layers require ArcGIS authentication. Click OK to sign in, then you'll be redirected back here.");
               if (userConfirm) {
-                const clientId = 'arcgisonline';
                 const redirectUri = encodeURIComponent(window.location.origin + window.location.pathname);
                 const authUrl = `https://www.arcgis.com/sharing/rest/oauth2/authorize?client_id=${clientId}&response_type=token&expiration=1440&redirect_uri=${redirectUri}`;
                 console.log("Opening authentication URL:", authUrl);
