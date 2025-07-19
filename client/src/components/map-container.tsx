@@ -179,18 +179,25 @@ export default function MapContainer({
                 opacity: 0.8,
               });
 
-              // Handle authentication errors
+              // Handle authentication and loading
               esriLayer.on('requesterror', (error: any) => {
                 console.error('Esri layer error:', error);
                 if (error.code === 499 || error.code === 403) {
-                  // Authentication required
                   console.log('Authentication required for layer:', layerConfig.name);
-                  // The error will trigger the browser's authentication dialog
+                  // Browser will handle authentication dialog automatically
                 }
               });
 
               esriLayer.on('load', () => {
                 console.log('Esri layer loaded successfully:', layerConfig.name);
+              });
+
+              esriLayer.on('loading', () => {
+                console.log('Loading', layerConfig.name, 'layer...');
+              });
+
+              esriLayer.on('load', () => {
+                console.log('Layer loaded:', layerConfig.name);
               });
 
               esriLayersRef.current.set(layerConfig.id, esriLayer);
