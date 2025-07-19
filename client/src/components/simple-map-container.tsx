@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Menu } from "lucide-react";
@@ -6,7 +6,6 @@ import Map from "@arcgis/core/Map";
 import MapView from "@arcgis/core/views/MapView";
 import Graphic from "@arcgis/core/Graphic";
 import GraphicsLayer from "@arcgis/core/layers/GraphicsLayer";
-import Sketch from "@arcgis/core/widgets/Sketch";
 import Polygon from "@arcgis/core/geometry/Polygon";
 import Polyline from "@arcgis/core/geometry/Polyline";
 import Point from "@arcgis/core/geometry/Point";
@@ -32,9 +31,9 @@ export default function MapContainer({
 }: MapContainerProps) {
   const mapDiv = useRef<HTMLDivElement>(null);
   const viewRef = useRef<MapView | null>(null);
-  const sketchRef = useRef<Sketch | null>(null);
   const polygonLayerRef = useRef<GraphicsLayer | null>(null);
   const routeLayerRef = useRef<GraphicsLayer | null>(null);
+  const [drawingPoints, setDrawingPoints] = useState<number[][]>([]);
 
   useEffect(() => {
     if (!mapDiv.current) return;
@@ -64,34 +63,11 @@ export default function MapContainer({
     map.add(polygonLayer);
     map.add(routeLayer);
 
-    // Create sketch widget
-    const sketch = new Sketch({
-      layer: polygonLayer,
-      view: view,
-      creationMode: "single",
-      availableCreateTools: ["polygon"],
-      defaultCreateOptions: {
-        mode: "click"
-      }
-    });
-
-    sketchRef.current = sketch;
-    // Don't add to UI initially - we'll control it programmatically
-
-    // Handle drawing
-    sketch.on("create", (event) => {
-      console.log("Sketch create event:", event.state);
-      if (event.state === "complete") {
-        const polygon = event.graphic.geometry as Polygon;
-        console.log("Polygon created:", polygon);
-        const geoJsonPolygon = {
-          type: "Polygon",
-          coordinates: [polygon.rings[0].map(coord => [coord[0], coord[1]])]
-        };
-        onPolygonChange(geoJsonPolygon);
-        if (onDrawingModeChange) {
-          onDrawingModeChange(false);
-        }
+    // Handle click events for drawing
+    view.on("click", (event) => {
+      if (drawingMode) {
+        const point = [event.mapPoint.longitude, event.mapPoint.latitude];
+        setDrawingPoints(prev => [...prev, point]);
       }
     });
 
@@ -105,29 +81,99 @@ export default function MapContainer({
 
   // Handle drawing mode
   useEffect(() => {
-    if (!sketchRef.current || !viewRef.current) return;
-    
     if (drawingMode) {
-      console.log("Starting polygon drawing...");
-      try {
-        // Add sketch to UI when drawing starts
-        viewRef.current.ui.add(sketchRef.current, "top-left");
-        sketchRef.current.create("polygon");
-      } catch (error) {
-        console.error("Error starting drawing:", error);
-      }
-    } else {
-      if (sketchRef.current) {
-        sketchRef.current.cancel();
-        // Remove sketch from UI when not drawing
-        viewRef.current.ui.remove(sketchRef.current);
-      }
+      console.log("Drawing mode started - click on the map to add points");
+      setDrawingPoints([]);
     }
   }, [drawingMode]);
 
+  // Update drawing preview
+  useEffect(() => {
+    if (!polygonLayerRef.current || !viewRef.current || !drawingMode) return;
+
+    // Clear previous drawings
+    polygonLayerRef.current.removeAll();
+
+    if (drawingPoints.length > 0) {
+      // Show points
+      drawingPoints.forEach(([lng, lat]) => {
+        const point = new Point({
+          longitude: lng,
+          latitude: lat,
+          spatialReference: { wkid: 4326 }
+        });
+
+        const pointGraphic = new Graphic({
+          geometry: point,
+          symbol: {
+            type: "simple-marker",
+            color: [255, 0, 0],
+            size: 8,
+            outline: {
+              color: [255, 255, 255],
+              width: 2
+            }
+          }
+        });
+
+        polygonLayerRef.current!.add(pointGraphic);
+      });
+
+      // Show lines if more than 1 point
+      if (drawingPoints.length > 1) {
+        const polyline = new Polyline({
+          paths: [drawingPoints],
+          spatialReference: { wkid: 4326 }
+        });
+
+        const lineGraphic = new Graphic({
+          geometry: polyline,
+          symbol: {
+            type: "simple-line",
+            color: [255, 0, 0],
+            width: 2,
+            style: "dash"
+          }
+        });
+
+        polygonLayerRef.current!.add(lineGraphic);
+      }
+    }
+  }, [drawingPoints, drawingMode]);
+
+  // Complete polygon
+  const completePolygon = () => {
+    if (drawingPoints.length < 3) {
+      alert("Need at least 3 points to create a polygon");
+      return;
+    }
+
+    // Close the polygon
+    const closedPoints = [...drawingPoints, drawingPoints[0]];
+    
+    const geoJsonPolygon = {
+      type: "Polygon",
+      coordinates: [closedPoints]
+    };
+
+    onPolygonChange(geoJsonPolygon);
+    setDrawingPoints([]);
+    if (onDrawingModeChange) {
+      onDrawingModeChange(false);
+    }
+  };
+
+  // Cancel drawing
+  const cancelDrawing = () => {
+    setDrawingPoints([]);
+    if (onDrawingModeChange) {
+      onDrawingModeChange(false);
+    }
+  };
+
   // Update polygon display
   useEffect(() => {
-    if (!polygonLayerRef.current || !viewRef.current) return;
+    if (!polygonLayerRef.current || !viewRef.current || drawingMode) return;
     
     polygonLayerRef.current.removeAll();
     
@@ -152,7 +198,7 @@ export default function MapContainer({
       polygonLayerRef.current.add(polygonGraphic);
       viewRef.current.goTo(polygonGeometry.extent.expand(1.2));
     }
-  }, [polygon]);
+  }, [polygon, drawingMode]);
 
   // Update route display
   useEffect(() => {
@@ -188,6 +234,7 @@ export default function MapContainer({
     if (routeLayerRef.current) {
       routeLayerRef.current.removeAll();
     }
+    setDrawingPoints([]);
     onPolygonChange(null);
   };
 
@@ -219,18 +266,21 @@ export default function MapContainer({
       {drawingMode && (
         <Card className="absolute bottom-4 left-1/2 transform -translate-x-1/2 p-3 shadow-lg">
           <div className="flex items-center space-x-3">
-            <p className="text-sm font-medium">Click points on the map to draw a polygon</p>
+            <p className="text-sm font-medium">
+              Click on the map to add points ({drawingPoints.length} points)
+            </p>
+            <Button
+              size="sm"
+              variant="default"
+              onClick={completePolygon}
+              disabled={drawingPoints.length < 3}
+            >
+              Complete
+            </Button>
             <Button
               size="sm"
               variant="destructive"
-              onClick={() => {
-                if (sketchRef.current) {
-                  sketchRef.current.cancel();
-                }
-                if (onDrawingModeChange) {
-                  onDrawingModeChange(false);
-                }
-              }}
+              onClick={cancelDrawing}
             >
               Cancel
             </Button>

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Helmet } from "react-helmet";
 import Sidebar from "@/components/sidebar";
-import MapContainer from "@/components/esri-map-simple";
+import MapContainer from "@/components/simple-map-container";
 import { useToast } from "@/hooks/use-toast";
 import { RouteParameters } from "@shared/schema";
 
