@@ -25,23 +25,24 @@ export default function ArcGISLayerControl({
     onLayerToggle(leaseLayerUrl, visible);
   };
 
-  if (!isAuthenticated) {
-    return (
-      <Card className="opacity-50">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-sm">
-            <Layers className="h-4 w-4" />
-            ArcGIS Layers
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">
-            Sign in to ArcGIS to access layers
-          </p>
-        </CardContent>
-      </Card>
-    );
-  }
+  // Remove authentication requirement since the layer works without it
+  // if (!isAuthenticated) {
+  //   return (
+  //     <Card className="opacity-50">
+  //       <CardHeader>
+  //         <CardTitle className="flex items-center gap-2 text-sm">
+  //           <Layers className="h-4 w-4" />
+  //           ArcGIS Layers
+  //         </CardTitle>
+  //       </CardHeader>
+  //       <CardContent>
+  //         <p className="text-sm text-muted-foreground">
+  //           Sign in to ArcGIS to access layers
+  //         </p>
+  //       </CardContent>
+  //     </Card>
+  //   );
+  // }
 
   return (
     <Card>

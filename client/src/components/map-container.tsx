@@ -222,9 +222,9 @@ export default function MapContainer({
     }
   }, [generatedRoute]);
 
-  // Handle ArcGIS layers
+  // Handle ArcGIS layers - no authentication required since test worked
   useEffect(() => {
-    if (!mapInstanceRef.current || !isAuthenticated) return;
+    if (!mapInstanceRef.current) return;
 
     Object.entries(arcgisLayers).forEach(async ([layerUrl, visible]) => {
       if (visible && !arcgisLayersRef.current[layerUrl]) {
@@ -261,7 +261,23 @@ export default function MapContainer({
           const featureSet = await featureLayer.queryFeatures(query);
           
           import("leaflet").then((L) => {
-            const geoJsonLayer = L.geoJSON(featureSet.toJSON(), {
+            // Convert ArcGIS features to proper GeoJSON
+            const geoJsonFeatures = featureSet.features.map(feature => {
+              return {
+                type: "Feature",
+                geometry: feature.geometry.toJSON(),
+                properties: feature.attributes || {}
+              };
+            });
+            
+            const geoJsonCollection = {
+              type: "FeatureCollection",
+              features: geoJsonFeatures
+            };
+            
+            console.log("Converted GeoJSON:", geoJsonCollection);
+            
+            const geoJsonLayer = L.geoJSON(geoJsonCollection, {
               style: {
                 color: '#ff6b35',
                 weight: 2,
