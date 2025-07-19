@@ -144,7 +144,7 @@ export default function BasicMap({
     };
   }, []);
 
-  // Display generated route on map
+  // Display generated route on map with level-of-detail optimization
   useEffect(() => {
     if (!mapView || !routeLayer || !generatedRoute) return;
 
@@ -158,50 +158,95 @@ export default function BasicMap({
       // Clear existing route graphics
       routeLayer.removeAll();
 
-      // Add transect lines
+      // Add transect lines (always show these)
       if (generatedRoute.transectLines) {
-        generatedRoute.transectLines.forEach((line: any, index: number) => {
-          const esriPolyline = new Polyline({
-            paths: [line.geometry.coordinates],
-            spatialReference: { wkid: 4326 }
+        try {
+          const graphics = generatedRoute.transectLines.map((line: any, index: number) => {
+            const esriPolyline = new Polyline({
+              paths: [line.geometry.coordinates],
+              spatialReference: { wkid: 4326 }
+            });
+
+            return new Graphic({
+              geometry: esriPolyline,
+              symbol: new SimpleLineSymbol({
+                color: index % 2 === 0 ? [255, 0, 0, 0.8] : [0, 255, 0, 0.8],
+                width: 2
+              })
+            });
           });
 
-          const lineGraphic = new Graphic({
-            geometry: esriPolyline,
-            symbol: new SimpleLineSymbol({
-              color: index % 2 === 0 ? [255, 0, 0] : [0, 255, 0],
-              width: 3
-            })
-          });
-
-          routeLayer.add(lineGraphic);
-        });
+          // Add graphics in batches to prevent overwhelming the renderer
+          routeLayer.addMany(graphics);
+        } catch (error) {
+          console.warn('Error adding route lines:', error);
+        }
       }
 
-      // Add waypoints
-      if (generatedRoute.waypoints) {
-        generatedRoute.waypoints.forEach((waypoint: any) => {
-          const point = new Point({
-            longitude: waypoint.lng,
-            latitude: waypoint.lat,
-            spatialReference: { wkid: 4326 }
-          });
+      // Add waypoints with level-of-detail (only show when zoomed in)
+      const updateWaypoints = () => {
+        const zoom = mapView.zoom;
+        const showWaypoints = zoom > 12; // Only show waypoints when zoomed in
 
-          const waypointGraphic = new Graphic({
-            geometry: point,
-            symbol: new SimpleMarkerSymbol({
-              color: [255, 255, 0],
-              size: 4,
-              outline: {
-                color: [0, 0, 0],
-                width: 1
-              }
-            })
-          });
+        // Remove existing waypoints
+        const waypointGraphics = routeLayer.graphics.filter((g: any) => 
+          g.symbol && g.symbol.type === 'simple-marker'
+        ).toArray();
+        
+        routeLayer.removeMany(waypointGraphics);
 
-          routeLayer.add(waypointGraphic);
-        });
+        if (showWaypoints && generatedRoute.waypoints) {
+          // Limit number of waypoints to prevent performance issues
+          const maxWaypoints = Math.min(500, generatedRoute.waypoints.length);
+          const step = Math.ceil(generatedRoute.waypoints.length / maxWaypoints);
+          
+          const waypointBatch = generatedRoute.waypoints
+            .filter((_: any, i: number) => i % step === 0)
+            .map((waypoint: any) => {
+              const point = new Point({
+                longitude: waypoint.lng,
+                latitude: waypoint.lat,
+                spatialReference: { wkid: 4326 }
+              });
+
+              return new Graphic({
+                geometry: point,
+                symbol: new SimpleMarkerSymbol({
+                  color: [255, 255, 0, 0.8],
+                  size: 3,
+                  outline: {
+                    color: [0, 0, 0, 0.6],
+                    width: 1
+                  }
+                })
+              });
+            });
+
+          if (waypointBatch.length > 0) {
+            routeLayer.addMany(waypointBatch);
+          }
+        }
+      };
+
+      // Initial waypoint update
+      updateWaypoints();
+
+      // Watch for zoom changes to update waypoint visibility
+      const zoomHandle = mapView.watch('zoom', () => {
+        try {
+          updateWaypoints();
+        } catch (error) {
+          console.warn('Error updating waypoints:', error);
+        }
+      });
+
+      // Clean up any existing watcher
+      if ((routeLayer as any).zoomHandle) {
+        (routeLayer as any).zoomHandle.remove();
       }
+
+      // Store cleanup function
+      (routeLayer as any).zoomHandle = zoomHandle;
 
       console.log("Route displayed on map:", generatedRoute.transectLines?.length, "lines");
     });
@@ -218,8 +263,13 @@ export default function BasicMap({
       setIsDrawing(false);
     }
     
-    // Clear route graphics
+    // Clear route graphics and cleanup watchers
     if (routeLayer) {
+      // Clean up zoom watcher if it exists
+      if ((routeLayer as any).zoomHandle) {
+        (routeLayer as any).zoomHandle.remove();
+        (routeLayer as any).zoomHandle = null;
+      }
       routeLayer.removeAll();
     }
     
