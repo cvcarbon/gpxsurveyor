@@ -504,14 +504,10 @@ export default function MapContainer({
         style={{ minHeight: "100vh" }}
       />
 
-      {/* Sidebar Toggle Button - Responsive positioning */}
-      <div className={cn(
-        "fixed top-4 z-50 transition-all duration-300",
-        sidebarOpen ? "left-[25rem] md:left-[25rem]" : "left-4"
-      )}>
+      {/* Sidebar Toggle Button - Top Right */}
+      <div className="fixed top-4 right-4 z-50">
         <Button
           onClick={() => {
-            console.log("Menu button clicked, current sidebar state:", sidebarOpen);
             if (onToggleSidebar) {
               onToggleSidebar();
             }
