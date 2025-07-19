@@ -124,7 +124,7 @@ NODE_ENV=production|development
 - July 07, 2025. Completed curved U-turn implementation following Python reference algorithm with proper point alignment and bearing-specific turn direction handling
 - July 07, 2025. Added waypoints along transect lines for smooth autopilot tracking and line extension logic to prevent reverse movement
 - July 07, 2025. Updated housekeeping: removed test polygon button, changed default map view to Galveston Bay TX, implemented custom filename format {route name}_{bearing}d_{distance}m
-- July 19, 2025. Reverted from Esri JavaScript API back to Leaflet due to rendering issues and white screen problems. Leaflet provides stable drawing functionality with proper polygon tools.
+- July 19, 2025. Successfully migrated to Esri JavaScript API with proper dynamic module loading, fixed white screen issues through better initialization and loading states.
 
 ## User Preferences
 
