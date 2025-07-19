@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Trash2, Menu, Edit3 } from "lucide-react";
+import { Trash2, Menu, Edit3, Eye } from "lucide-react";
 
 interface BasicMapProps {
   polygon: any;
@@ -25,6 +25,7 @@ export default function BasicMap({
   const [sketch, setSketch] = useState<any>(null);
   const [mapView, setMapView] = useState<any>(null);
   const [routeLayer, setRouteLayer] = useState<any>(null);
+  const [showWaypoints, setShowWaypoints] = useState(false);
 
   useEffect(() => {
     let view: any = null;
@@ -184,61 +185,68 @@ export default function BasicMap({
       }
 
       // Add waypoints with level-of-detail (only show when zoomed in)
+      let updateTimeout: NodeJS.Timeout | null = null;
+      
       const updateWaypoints = () => {
-        const zoom = mapView.zoom;
-        const showWaypoints = zoom > 12; // Only show waypoints when zoomed in
-
-        // Remove existing waypoints
-        const waypointGraphics = routeLayer.graphics.filter((g: any) => 
-          g.symbol && g.symbol.type === 'simple-marker'
-        ).toArray();
-        
-        routeLayer.removeMany(waypointGraphics);
-
-        if (showWaypoints && generatedRoute.waypoints) {
-          // Limit number of waypoints to prevent performance issues
-          const maxWaypoints = Math.min(500, generatedRoute.waypoints.length);
-          const step = Math.ceil(generatedRoute.waypoints.length / maxWaypoints);
-          
-          const waypointBatch = generatedRoute.waypoints
-            .filter((_: any, i: number) => i % step === 0)
-            .map((waypoint: any) => {
-              const point = new Point({
-                longitude: waypoint.lng,
-                latitude: waypoint.lat,
-                spatialReference: { wkid: 4326 }
-              });
-
-              return new Graphic({
-                geometry: point,
-                symbol: new SimpleMarkerSymbol({
-                  color: [255, 255, 0, 0.8],
-                  size: 3,
-                  outline: {
-                    color: [0, 0, 0, 0.6],
-                    width: 1
-                  }
-                })
-              });
-            });
-
-          if (waypointBatch.length > 0) {
-            routeLayer.addMany(waypointBatch);
-          }
+        // Clear existing timeout to debounce updates
+        if (updateTimeout) {
+          clearTimeout(updateTimeout);
         }
+        
+        updateTimeout = setTimeout(() => {
+          try {
+            const zoom = mapView.zoom;
+            const shouldShowWaypoints = showWaypoints && zoom > 14; // Only show when user enables and zoomed in
+
+            // Remove existing waypoints
+            const waypointGraphics = routeLayer.graphics.filter((g: any) => 
+              g.symbol && g.symbol.type === 'simple-marker'
+            ).toArray();
+            
+            routeLayer.removeMany(waypointGraphics);
+
+            if (shouldShowWaypoints && generatedRoute.waypoints) {
+              // Very conservative waypoint limits to prevent performance issues
+              const maxWaypoints = Math.min(50, generatedRoute.waypoints.length);
+              const step = Math.ceil(generatedRoute.waypoints.length / maxWaypoints);
+              
+              const waypointBatch = generatedRoute.waypoints
+                .filter((_: any, i: number) => i % step === 0)
+                .map((waypoint: any) => {
+                  const point = new Point({
+                    longitude: waypoint.lng,
+                    latitude: waypoint.lat,
+                    spatialReference: { wkid: 4326 }
+                  });
+
+                  return new Graphic({
+                    geometry: point,
+                    symbol: new SimpleMarkerSymbol({
+                      color: [255, 255, 0, 0.8],
+                      size: 3,
+                      outline: {
+                        color: [0, 0, 0, 0.6],
+                        width: 1
+                      }
+                    })
+                  });
+                });
+
+              if (waypointBatch.length > 0) {
+                routeLayer.addMany(waypointBatch);
+              }
+            }
+          } catch (error) {
+            console.warn('Error updating waypoints:', error);
+          }
+        }, 250); // 250ms debounce delay
       };
 
       // Initial waypoint update
       updateWaypoints();
 
-      // Watch for zoom changes to update waypoint visibility
-      const zoomHandle = mapView.watch('zoom', () => {
-        try {
-          updateWaypoints();
-        } catch (error) {
-          console.warn('Error updating waypoints:', error);
-        }
-      });
+      // Watch for zoom changes to update waypoint visibility (throttled)
+      const zoomHandle = mapView.watch('zoom', updateWaypoints);
 
       // Clean up any existing watcher
       if ((routeLayer as any).zoomHandle) {
@@ -250,7 +258,7 @@ export default function BasicMap({
 
       console.log("Route displayed on map:", generatedRoute.transectLines?.length, "lines");
     });
-  }, [generatedRoute, mapView, routeLayer]);
+  }, [generatedRoute, mapView, routeLayer, showWaypoints]);
 
   const handleClear = () => {
     if (sketch && mapView) {
@@ -383,6 +391,18 @@ export default function BasicMap({
               <Trash2 className="h-4 w-4 mr-2" />
               Clear
             </Button>
+            
+            {generatedRoute && (
+              <Button
+                variant={showWaypoints ? "default" : "outline"}
+                size="sm"
+                onClick={() => setShowWaypoints(!showWaypoints)}
+                className="w-full"
+              >
+                <Eye className="h-4 w-4 mr-2" />
+                {showWaypoints ? "Hide Points" : "Show Points"}
+              </Button>
+            )}
           </Card>
         </div>
       )}
