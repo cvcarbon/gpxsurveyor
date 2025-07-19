@@ -6,7 +6,6 @@ import PolygonInput from "./polygon-input";
 import RouteParameters from "./route-parameters";
 import RouteGeneration from "./route-generation";
 import ExportOptions from "./export-options";
-import MapSettings from "./map-settings";
 import { RouteParameters as RouteParametersType } from "@shared/schema";
 import { cn } from "@/lib/utils";
 
@@ -21,7 +20,6 @@ interface SidebarProps {
   isGenerating: boolean;
   onRouteGenerated: (route: any) => void;
   onError: (error: string) => void;
-  onMapSettingsChange: (settings: { arcgisClientId: string }) => void;
 }
 
 export default function Sidebar({
@@ -35,7 +33,6 @@ export default function Sidebar({
   isGenerating,
   onRouteGenerated,
   onError,
-  onMapSettingsChange,
 }: SidebarProps) {
   return (
     <div className={cn(
@@ -55,8 +52,6 @@ export default function Sidebar({
 
       {/* Scrollable Content */}
       <div className="flex-1 overflow-y-auto">
-        <MapSettings onSettingsChange={onMapSettingsChange} />
-        
         <PolygonInput
           polygon={polygon}
           onPolygonChange={onPolygonChange}

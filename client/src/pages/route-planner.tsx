@@ -16,7 +16,6 @@ export default function RoutePlanner() {
   });
   const [generatedRoute, setGeneratedRoute] = useState<any>(null);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [mapSettings, setMapSettings] = useState({ arcgisClientId: '' });
   const { toast } = useToast();
 
   const handlePolygonChange = (newPolygon: any) => {
@@ -45,10 +44,6 @@ export default function RoutePlanner() {
     });
   };
 
-  const handleMapSettingsChange = (settings: { arcgisClientId: string }) => {
-    setMapSettings(settings);
-  };
-
   return (
     <>
       <Helmet>
@@ -68,7 +63,6 @@ export default function RoutePlanner() {
           isGenerating={isGenerating}
           onRouteGenerated={handleRouteGenerated}
           onError={handleError}
-          onMapSettingsChange={handleMapSettingsChange}
         />
         
         <div className="flex-1 relative">

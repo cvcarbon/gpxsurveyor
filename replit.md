@@ -116,7 +116,6 @@ uploaded_files (
 ```
 DATABASE_URL=postgresql://... # Required for database connection
 NODE_ENV=production|development
-VITE_ARCGIS_CLIENT_ID=your_oauth_app_id # Optional: ArcGIS OAuth App ID for authenticated layers
 ```
 
 ## Changelog
@@ -125,7 +124,6 @@ VITE_ARCGIS_CLIENT_ID=your_oauth_app_id # Optional: ArcGIS OAuth App ID for auth
 - July 07, 2025. Completed curved U-turn implementation following Python reference algorithm with proper point alignment and bearing-specific turn direction handling
 - July 07, 2025. Added waypoints along transect lines for smooth autopilot tracking and line extension logic to prevent reverse movement
 - July 07, 2025. Updated housekeeping: removed test polygon button, changed default map view to Galveston Bay TX, implemented custom filename format {route name}_{bearing}d_{distance}m
-- July 19, 2025. Implemented OAuth token-based authentication for Esri REST FeatureServer layers with automatic token storage and page refresh handling
 
 ## User Preferences
 
