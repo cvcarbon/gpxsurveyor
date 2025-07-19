@@ -262,7 +262,7 @@ export default function MapContainer({
           // Get all features using pagination to bypass 2000 feature limit
           const allFeatures = [];
           let offset = 0;
-          const maxRecordCount = 1000; // Reduce batch size for better performance
+          const maxRecordCount = 2000; // Use server's preferred batch size
           let hasMoreFeatures = true;
           
           console.log("Fetching all features with pagination...");
@@ -286,10 +286,14 @@ export default function MapContainer({
               offset += featureSet.features.length;
               console.log(`Fetched ${featureSet.features.length} features, total: ${allFeatures.length}`);
               
-              // Stop when we have all features or reach the known total
-              if (allFeatures.length >= featureCount || featureSet.features.length < maxRecordCount) {
+              // Stop when we have all features or when we get fewer than expected
+              if (allFeatures.length >= featureCount) {
                 hasMoreFeatures = false;
-                console.log(`Reached end of features: ${allFeatures.length}/${featureCount}`);
+                console.log(`Got all features: ${allFeatures.length}/${featureCount}`);
+              } else if (featureSet.features.length < 2000) {
+                // If we get less than 2000, it means we've reached the end
+                hasMoreFeatures = false;
+                console.log(`Reached end with partial batch: ${allFeatures.length}/${featureCount}`);
               }
               
               // Safety check to prevent infinite loops
