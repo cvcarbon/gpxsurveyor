@@ -28,9 +28,8 @@ export default function RoutePlanner() {
       const isMobile = window.innerWidth < 768; // md breakpoint
       if (isMobile) {
         setSidebarOpen(false); // Close on mobile
-      } else {
-        setSidebarOpen(true); // Open on desktop
       }
+      // Don't auto-open on desktop to allow manual control
     };
 
     // Set initial state

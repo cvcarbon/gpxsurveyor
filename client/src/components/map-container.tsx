@@ -504,14 +504,15 @@ export default function MapContainer({
         style={{ minHeight: "100vh" }}
       />
 
-      {/* Sidebar Toggle Button (shown when sidebar is closed) */}
-      {!sidebarOpen && onToggleSidebar && (
-        <div className="absolute top-4 left-4 z-10">
+      {/* Sidebar Toggle Button */}
+      {onToggleSidebar && (
+        <div className="absolute top-4 left-4 z-50">
           <Button
             onClick={onToggleSidebar}
             variant="default"
             size="icon"
             className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg"
+            title={sidebarOpen ? "Close sidebar" : "Open sidebar"}
           >
             <Menu className="h-5 w-5" />
           </Button>
