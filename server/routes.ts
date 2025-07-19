@@ -177,49 +177,80 @@ async function generateTransectRoute(polygon: any, parameters: any) {
     
     console.log("Polygon feature created successfully");
     
-    // Calculate bounding box
+    // Calculate effective line spacing (accounting for overlap)
+    const effectiveDistance = parameters.distance * (1 - parameters.overlap / 100);
+    
+    // Get polygon bounding box and expand it
     const bbox = turf.bbox(polygonFeature);
     const [minX, minY, maxX, maxY] = bbox;
     
-    // Convert bearing to radians
-    const bearingRad = (parameters.bearing * Math.PI) / 180;
+    // Calculate polygon dimensions
+    const width = maxX - minX;
+    const height = maxY - minY;
+    const diagonal = Math.sqrt(width * width + height * height);
+    
+    // Convert bearing to perpendicular direction for line generation
+    // We want lines perpendicular to the bearing direction
+    const perpBearing = (parameters.bearing + 90) % 360;
+    const perpBearingRad = (perpBearing * Math.PI) / 180;
+    
+    // Calculate how many lines we need to cover the polygon completely
+    // Project polygon diagonal onto the perpendicular bearing direction
+    const projectedWidth = Math.abs(width * Math.cos(perpBearingRad)) + Math.abs(height * Math.sin(perpBearingRad));
+    const lineCount = Math.ceil(projectedWidth * 111000 / effectiveDistance) + 2; // Add buffer lines
+    
+    console.log(`Generating ${lineCount} transect lines with ${effectiveDistance}m spacing`);
+    
+    // Get polygon center for line generation
+    const center = turf.center(polygonFeature).geometry.coordinates;
     
     // Generate parallel lines
     const transectLines = [];
     const waypoints = [];
     
-    // Calculate line spacing (accounting for overlap)
-    const effectiveDistance = parameters.distance * (1 - parameters.overlap / 100);
-    
-    // Generate transect lines based on bearing
-    const lineCount = Math.ceil((maxX - minX) / (effectiveDistance / 111000)); // Rough conversion to degrees
-    console.log(`Generated ${lineCount} transect lines with ${effectiveDistance}m spacing`);
-    
-    // First pass: Generate all transect lines
     for (let i = 0; i < lineCount; i++) {
-      const x = minX + (i * effectiveDistance / 111000);
+      // Calculate offset from center along perpendicular bearing
+      const offset = (i - lineCount / 2) * (effectiveDistance / 111000);
       
-      // Create line from south to north of bounding box
+      // Calculate line start point by moving along perpendicular bearing
+      const offsetX = offset * Math.cos(perpBearingRad);
+      const offsetY = offset * Math.sin(perpBearingRad);
+      const lineCenter = [center[0] + offsetX, center[1] + offsetY];
+      
+      // Create a long line along the bearing direction
+      const lineLength = diagonal * 2; // Make it long enough to span the polygon
+      const lineLengthDegrees = lineLength;
+      
+      const bearingRad = (parameters.bearing * Math.PI) / 180;
+      const startX = lineCenter[0] - lineLengthDegrees * Math.cos(bearingRad);
+      const startY = lineCenter[1] - lineLengthDegrees * Math.sin(bearingRad);
+      const endX = lineCenter[0] + lineLengthDegrees * Math.cos(bearingRad);
+      const endY = lineCenter[1] + lineLengthDegrees * Math.sin(bearingRad);
+      
       const line = turf.lineString([
-        [x, minY - 0.01],
-        [x, maxY + 0.01]
+        [startX, startY],
+        [endX, endY]
       ]);
       
-      // Rotate line by bearing
-      const rotatedLine = turf.transformRotate(line, parameters.bearing, { pivot: turf.center(polygonFeature) });
-      
-      // Clip line to polygon
+      // Find intersections with polygon
       try {
-        const clippedLine = turf.lineIntersect(rotatedLine, polygonFeature);
-        if (clippedLine.features.length >= 2) {
-          // Convert intersection points to line, sort by latitude for consistency
-          const coords = clippedLine.features.map(f => f.geometry.coordinates);
-          const sortedCoords = coords.sort((a, b) => a[1] - b[1]); // Sort by latitude
-          const transectLine = turf.lineString([sortedCoords[0], sortedCoords[sortedCoords.length - 1]]);
+        const intersections = turf.lineIntersect(line, polygonFeature);
+        
+        if (intersections.features.length >= 2) {
+          // Sort intersection points along the line direction
+          const coords = intersections.features.map(f => f.geometry.coordinates);
+          coords.sort((a, b) => {
+            const distA = Math.sqrt(Math.pow(a[0] - startX, 2) + Math.pow(a[1] - startY, 2));
+            const distB = Math.sqrt(Math.pow(b[0] - startX, 2) + Math.pow(b[1] - startY, 2));
+            return distA - distB;
+          });
+          
+          // Create transect line from first to last intersection
+          const transectLine = turf.lineString([coords[0], coords[coords.length - 1]]);
           transectLines.push(transectLine);
         }
       } catch (e) {
-        console.warn("Failed to clip line to polygon:", e);
+        console.warn("Failed to intersect line with polygon:", e);
       }
     }
 
