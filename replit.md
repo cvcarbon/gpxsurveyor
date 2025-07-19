@@ -12,7 +12,7 @@ This is a full-stack web application that generates autopilot routes for transec
 - **Styling**: Tailwind CSS with CSS variables for theming
 - **State Management**: React hooks and TanStack Query for server state
 - **Routing**: Wouter for client-side routing
-- **Map Integration**: Leaflet with drawing capabilities
+- **Map Integration**: Esri JavaScript API 4.30 with drawing and REST layer support
 - **Build Tool**: Vite
 
 ### Backend Architecture
@@ -84,8 +84,7 @@ uploaded_files (
 - **@radix-ui/react-***: Component primitives for UI
 - **@tanstack/react-query**: Server state management
 - **@turf/turf**: Geospatial calculations
-- **leaflet**: Interactive mapping
-- **leaflet-draw**: Drawing tools
+- **Esri JavaScript API 4.30**: Interactive mapping, drawing tools, and REST layer support
 - **wouter**: Client-side routing
 - **react-hook-form**: Form handling
 - **date-fns**: Date manipulation
@@ -124,6 +123,7 @@ NODE_ENV=production|development
 - July 07, 2025. Completed curved U-turn implementation following Python reference algorithm with proper point alignment and bearing-specific turn direction handling
 - July 07, 2025. Added waypoints along transect lines for smooth autopilot tracking and line extension logic to prevent reverse movement
 - July 07, 2025. Updated housekeeping: removed test polygon button, changed default map view to Galveston Bay TX, implemented custom filename format {route name}_{bearing}d_{distance}m
+- July 19, 2025. Major architecture change: Migrated from Leaflet to Esri JavaScript API 4.30 for enhanced mapping capabilities and Esri REST layer support with authentication
 
 ## User Preferences
 
