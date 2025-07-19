@@ -27,11 +27,13 @@ export function ArcGISAuthProvider({ children }: { children: ReactNode }) {
                      import.meta.env.VITE_ARCGIS_CLIENT_ID || 
                      "fallback-client-id";
     
+    console.log("ArcGIS Client ID:", clientId);
+    
     const oAuthInfo = new OAuthInfo({
       appId: clientId,
-      portalUrl: "https://www.arcgis.com/sharing/rest",
-      popup: false, // Use redirect instead of popup
-      flowType: "authorization-code"
+      portalUrl: "https://www.arcgis.com",
+      popup: true, // Use popup for easier authentication
+      flowType: "auto"
     });
 
     IdentityManager.registerOAuthInfos([oAuthInfo]);
@@ -43,11 +45,11 @@ export function ArcGISAuthProvider({ children }: { children: ReactNode }) {
   const checkAuthStatus = async () => {
     try {
       setIsLoading(true);
-      const credential = await IdentityManager.checkSignInStatus("https://www.arcgis.com/sharing/rest");
+      const credential = await IdentityManager.checkSignInStatus("https://www.arcgis.com");
       
       if (credential) {
         const portalInstance = new Portal({
-          url: "https://www.arcgis.com/sharing/rest"
+          url: "https://www.arcgis.com"
         });
         
         await portalInstance.load();
@@ -67,13 +69,17 @@ export function ArcGISAuthProvider({ children }: { children: ReactNode }) {
   const signIn = async () => {
     try {
       setIsLoading(true);
-      const credential = await IdentityManager.getCredential("https://www.arcgis.com/sharing/rest");
+      console.log("Attempting to sign in to ArcGIS...");
+      
+      const credential = await IdentityManager.getCredential("https://www.arcgis.com");
+      console.log("Sign in successful, credential received:", credential);
       
       const portalInstance = new Portal({
-        url: "https://www.arcgis.com/sharing/rest"
+        url: "https://www.arcgis.com"
       });
       
       await portalInstance.load();
+      console.log("Portal loaded successfully:", portalInstance);
       
       setIsAuthenticated(true);
       setUser(portalInstance.user);
