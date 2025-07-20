@@ -26,10 +26,7 @@ export default function RoutePlanner() {
   useEffect(() => {
     const handleResize = () => {
       const isMobile = window.innerWidth < 768; // md breakpoint
-      if (isMobile) {
-        setSidebarOpen(false); // Close on mobile
-      }
-      // Don't auto-open on desktop to allow manual control
+      setSidebarOpen(!isMobile); // Open on desktop, closed on mobile
     };
 
     // Set initial state

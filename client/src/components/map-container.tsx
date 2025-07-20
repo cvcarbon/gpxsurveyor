@@ -504,25 +504,19 @@ export default function MapContainer({
         style={{ minHeight: "100vh" }}
       />
 
-      {/* Sidebar Toggle Button - Top Right - Always Visible */}
-      <div className="fixed top-4 right-4 z-[9999] bg-red-500 p-2 rounded">
-        <Button
-          onClick={() => {
-            console.log("BUTTON CLICKED!");
-            if (onToggleSidebar) {
-              onToggleSidebar();
-            } else {
-              console.log("onToggleSidebar is not defined");
-            }
-          }}
-          variant="default"
-          size="lg"
-          className="bg-yellow-500 hover:bg-yellow-600 text-black shadow-xl border-4 border-black"
-          title="Toggle Sidebar"
-        >
-          MENU
-        </Button>
-      </div>
+      {/* Mobile Menu Button - Only visible on mobile when sidebar is closed */}
+      {!sidebarOpen && (
+        <div className="fixed top-4 left-4 z-50 md:hidden">
+          <Button
+            onClick={onToggleSidebar}
+            variant="default"
+            size="icon"
+            className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg"
+          >
+            <Menu className="h-5 w-5" />
+          </Button>
+        </div>
+      )}
 
       {/* Map Controls - Moved down to avoid conflict with menu button */}
       <div className="absolute top-20 right-4 space-y-2 hidden md:block">
