@@ -7,6 +7,7 @@ import { RouteParameters } from "@shared/schema";
 
 export default function RoutePlanner() {
   const [sidebarOpen, setSidebarOpen] = useState(true); // Start open, will be responsive
+  const [userToggled, setUserToggled] = useState(false); // Track if user manually toggled
   const [polygon, setPolygon] = useState<any>(null);
   const [routeParameters, setRouteParameters] = useState<RouteParameters>({
     distance: 50,
@@ -26,7 +27,10 @@ export default function RoutePlanner() {
   useEffect(() => {
     const handleResize = () => {
       const isMobile = window.innerWidth < 768; // md breakpoint
-      setSidebarOpen(!isMobile); // Open on desktop, closed on mobile
+      // Only auto-set if user hasn't manually toggled
+      if (!userToggled) {
+        setSidebarOpen(!isMobile); // Open on desktop, closed on mobile
+      }
     };
 
     // Set initial state
@@ -35,7 +39,7 @@ export default function RoutePlanner() {
     // Listen for window resize
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  }, [userToggled]);
 
   const handlePolygonChange = (newPolygon: any) => {
     setPolygon(newPolygon);
@@ -88,7 +92,10 @@ export default function RoutePlanner() {
         
         <Sidebar
           open={sidebarOpen}
-          onToggle={() => setSidebarOpen(!sidebarOpen)}
+          onToggle={() => {
+            setSidebarOpen(!sidebarOpen);
+            setUserToggled(true);
+          }}
           polygon={polygon}
           onPolygonChange={handlePolygonChange}
           routeParameters={routeParameters}
@@ -107,7 +114,10 @@ export default function RoutePlanner() {
             onPolygonChange={handlePolygonChange}
             generatedRoute={generatedRoute}
             sidebarOpen={sidebarOpen}
-            onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+            onToggleSidebar={() => {
+              setSidebarOpen(!sidebarOpen);
+              setUserToggled(true);
+            }}
             arcgisLayers={arcgisLayers}
           />
         </div>
