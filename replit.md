@@ -130,6 +130,7 @@ ARCGIS_CLIENT_ID=your_arcgis_oauth_app_id # Required for ArcGIS authentication a
 - July 19, 2025. Fixed ArcGIS REST API pagination issues using ObjectID-based queries instead of offset-based pagination, resolving duplicate and missing feature problems
 - July 19, 2025. Added second ArcGIS layer (Bedding Documentation) with distinct styling, removed test components, and set both layers to display by default
 - July 19, 2025. Implemented mobile-responsive design with sidebar always visible on desktop and toggleable via menu button on mobile
+- July 20, 2025. Completed mobile menu button functionality - button only appears when sidebar is closed, uses X button in sidebar header when open
 
 ## User Preferences
 
