@@ -82,11 +82,14 @@ export default function RoutePlanner() {
       </Helmet>
       
       <div className="flex h-screen overflow-hidden">
-        {/* Mobile overlay */}
+        {/* Mobile overlay - only on mobile and when sidebar is open */}
         {sidebarOpen && (
           <div 
-            className="fixed inset-0 bg-black bg-opacity-50 z-30 md:hidden"
-            onClick={() => setSidebarOpen(false)}
+            className="fixed inset-0 bg-black bg-opacity-50 z-[9997] md:hidden"
+            onClick={() => {
+              setSidebarOpen(false);
+              setUserToggled(true);
+            }}
           />
         )}
         

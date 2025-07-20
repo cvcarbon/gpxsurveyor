@@ -44,7 +44,7 @@ export default function Sidebar({
   return (
     <div className={cn(
       "w-96 bg-white shadow-xl border-r border-gray-200 flex flex-col transition-transform duration-300",
-      "fixed left-0 top-0 h-full z-40 md:relative md:z-auto",
+      "fixed left-0 top-0 h-full z-[9998] md:relative md:z-auto",
       // Desktop: always visible (md:translate-x-0)
       // Mobile: show/hide based on open state
       open 
