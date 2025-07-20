@@ -504,16 +504,21 @@ export default function MapContainer({
         style={{ minHeight: "100vh" }}
       />
 
-      {/* Mobile Menu Button - Always visible on mobile */}
-      <div className="fixed top-4 left-4 z-50 md:hidden">
+      {/* Mobile Menu Button - Visible on all screen sizes for testing */}
+      <div className="fixed top-4 left-4 z-[9999] bg-red-500 p-2 rounded-lg">
         <Button
-          onClick={onToggleSidebar}
+          onClick={() => {
+            console.log("MOBILE MENU CLICKED!");
+            if (onToggleSidebar) {
+              onToggleSidebar();
+            }
+          }}
           variant="default"
-          size="icon"
-          className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg"
+          size="lg"
+          className="bg-yellow-400 hover:bg-yellow-500 text-black font-bold border-2 border-black"
           title="Toggle Menu"
         >
-          <Menu className="h-5 w-5" />
+          MENU
         </Button>
       </div>
 
