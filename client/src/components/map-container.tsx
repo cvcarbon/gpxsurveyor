@@ -504,19 +504,18 @@ export default function MapContainer({
         style={{ minHeight: "100vh" }}
       />
 
-      {/* Mobile Menu Button - Only visible on mobile when sidebar is closed */}
-      {!sidebarOpen && (
-        <div className="fixed top-4 left-4 z-50 md:hidden">
-          <Button
-            onClick={onToggleSidebar}
-            variant="default"
-            size="icon"
-            className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg"
-          >
-            <Menu className="h-5 w-5" />
-          </Button>
-        </div>
-      )}
+      {/* Mobile Menu Button - Always visible on mobile */}
+      <div className="fixed top-4 left-4 z-50 md:hidden">
+        <Button
+          onClick={onToggleSidebar}
+          variant="default"
+          size="icon"
+          className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg"
+          title="Toggle Menu"
+        >
+          <Menu className="h-5 w-5" />
+        </Button>
+      </div>
 
       {/* Map Controls - Moved down to avoid conflict with menu button */}
       <div className="absolute top-20 right-4 space-y-2 hidden md:block">
