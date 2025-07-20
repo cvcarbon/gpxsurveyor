@@ -507,19 +507,13 @@ export default function MapContainer({
       {/* Mobile Menu Button - Bottom center, mobile only */}
       <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-[9999] md:hidden">
         <Button
-          onClick={() => {
-            alert("Button clicked!");
-            console.log("Button clicked, calling onToggleSidebar");
-            if (onToggleSidebar) {
-              onToggleSidebar();
-            }
-          }}
+          onClick={onToggleSidebar}
           variant="default"
           size="lg"
-          className="bg-red-600 hover:bg-red-700 text-white shadow-lg rounded-full px-6"
+          className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg rounded-full px-6"
         >
           <Menu className="h-5 w-5 mr-2" />
-          MENU TEST
+          Menu
         </Button>
       </div>
 
