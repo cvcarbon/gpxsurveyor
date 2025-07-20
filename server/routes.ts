@@ -260,17 +260,17 @@ async function generateTransectRoute(polygon: any, parameters: any) {
           nextTravelStart = nextEnd;
         }
         
-        // Current turn direction - exactly following Python reference
-        // Python: turn_right = (idx % 2 == 0)
-        const turnRight = (i % 2 === 0);
+        // Calculate geometric turn direction using cross product
+        // This ensures curves always turn outward regardless of bearing
+        const currentLineVec = [travelEnd[0] - travelStart[0], travelEnd[1] - travelStart[1]];
+        const nextLineVec = [nextTravelStart[0] - travelEnd[0], nextTravelStart[1] - travelEnd[1]];
         
-        // Following Python method exactly
-        // Python: P_end = arcpy.Point(travel_end.X, travel_end.Y)
-        // Python: P_next = arcpy.Point(next_start.X, next_start.Y) 
-        // Python: p_end_D = P_end.X * D[0] + P_end.Y * D[1]
-        // Python: T1 = P_end
-        // Python: T2 = adjust_point(P_next, D, p_end_D)
+        // Cross product to determine turn direction 
+        const crossProduct = currentLineVec[0] * nextLineVec[1] - currentLineVec[1] * nextLineVec[0];
+        // Invert the logic to ensure outward curves
+        const turnRight = crossProduct < 0;
         
+        // Following Python method for point alignment
         const P_end = travelEnd;
         const P_next = nextTravelStart;
         const p_end_D = P_end[0] * D[0] + P_end[1] * D[1];

@@ -131,7 +131,7 @@ ARCGIS_CLIENT_ID=your_arcgis_oauth_app_id # Required for ArcGIS authentication a
 - July 19, 2025. Added second ArcGIS layer (Bedding Documentation) with distinct styling, removed test components, and set both layers to display by default
 - July 19, 2025. Implemented mobile-responsive design with sidebar always visible on desktop and toggleable via menu button on mobile
 - July 20, 2025. Completed mobile menu button functionality - button only appears when sidebar is closed, uses X button in sidebar header when open
-- July 20, 2025. Fixed curve generation algorithm to exactly match Python reference implementation, resolving inverted curves at certain bearings (like 45 degrees)
+- July 20, 2025. Fixed curve generation algorithm using geometric turn detection via cross product, ensuring curves always turn outward regardless of bearing angle
 
 ## User Preferences
 
