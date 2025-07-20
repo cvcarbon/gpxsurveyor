@@ -184,8 +184,13 @@ async function generateTransectRoute(polygon: any, parameters: any) {
     // Following the Python reference method for smooth curve generation
     const turnRadiusMeters = parameters.turnRadius || (parameters.distance * 0.5);
     
-    // Use existing bearingRad from above for direction vector calculations
-    const D = [Math.sin(bearingRad), Math.cos(bearingRad)]; // Direction vector
+    // Calculate direction vectors exactly like Python reference
+    // Python: dx = math.sin(angle_rad), dy = math.cos(angle_rad)
+    // Python: D = (dx, dy), P = (dy, -dx)
+    const dx = Math.sin(bearingRad);
+    const dy = Math.cos(bearingRad);
+    const D = [dx, dy]; // Direction vector (along transect lines)
+    const P = [dy, -dx]; // Perpendicular vector (across transect spacing)
     
     // Helper function to align points in survey direction (like Python adjust_point)
     const alignPoint = (point: number[], target: number, directionVector: number[]) => {
@@ -255,97 +260,67 @@ async function generateTransectRoute(polygon: any, parameters: any) {
           nextTravelStart = nextEnd;
         }
         
-        // Current turn direction - determine based on bearing and line index
-        let turnRight = (i % 2 === 0);
-        // For 0-degree bearing, keep original logic
-        // For other bearings, adjust based on quadrant
-        if (parameters.bearing >= 45 && parameters.bearing < 135) {
-          // East quadrant (45-135 degrees)
-          turnRight = !turnRight;
-        } else if (parameters.bearing >= 135 && parameters.bearing < 225) {
-          // South quadrant (135-225 degrees)
-          turnRight = !turnRight;
-        } else if (parameters.bearing >= 225 && parameters.bearing < 315) {
-          // West quadrant (225-315 degrees)
-          turnRight = !turnRight;
-        }
-        // North quadrant (315-45 degrees) keeps original logic
+        // Current turn direction - exactly following Python reference
+        // Python: turn_right = (idx % 2 == 0)
+        const turnRight = (i % 2 === 0);
         
-        // Following Python method: align points in survey direction
-        let T1 = travelEnd;
-        const T1_proj = T1[0] * D[0] + T1[1] * D[1];
-        const nextProj = nextTravelStart[0] * D[0] + nextTravelStart[1] * D[1];
+        // Following Python method exactly
+        // Python: P_end = arcpy.Point(travel_end.X, travel_end.Y)
+        // Python: P_next = arcpy.Point(next_start.X, next_start.Y) 
+        // Python: p_end_D = P_end.X * D[0] + P_end.Y * D[1]
+        // Python: T1 = P_end
+        // Python: T2 = adjust_point(P_next, D, p_end_D)
         
-        // Check if we need to extend based on alternating pattern
-        // Use a more robust extension logic that considers the geometric relationship
-        let needsExtension = false;
-        const projectionDiff = nextProj - T1_proj;
+        const P_end = travelEnd;
+        const P_next = nextTravelStart;
+        const p_end_D = P_end[0] * D[0] + P_end[1] * D[1];
         
-        // Extension logic: extend if the next line's start is significantly ahead/behind
-        // in the survey direction compared to current line's end
-        if (Math.abs(projectionDiff) > 0.00001) { // Only extend if there's a meaningful difference
-          if (i % 2 === 0) {
-            // Even lines: extend if next is ahead in survey direction
-            needsExtension = projectionDiff > 0;
-          } else {
-            // Odd lines: extend if next is behind in survey direction
-            needsExtension = projectionDiff < 0;
-          }
-        }
+        const T1 = P_end;
+        const T2 = alignPoint(P_next, p_end_D, D);
         
-        if (needsExtension) {
-          const extensionInSurveyDirection = Math.abs(projectionDiff) + 0.0002; // Slightly larger buffer
-          const extensionDirection = projectionDiff > 0 ? 1 : -1;
-          
-          T1 = [
-            T1[0] + extensionInSurveyDirection * extensionDirection * D[0],
-            T1[1] + extensionInSurveyDirection * extensionDirection * D[1]
-          ];
-          
-          // Add waypoint for the extended endpoint
-          waypoints.push({ lat: T1[1], lng: T1[0] });
-        }
+        // Calculate chord distance and radius exactly like Python
+        // Python: chord_dx = T2.X - T1.X
+        // Python: chord_dy = T2.Y - T1.Y 
+        // Python: chord_dist = math.hypot(chord_dx, chord_dy)
+        // Python: R = chord_dist / 2.0
+        const chord_dx = T2[0] - T1[0];
+        const chord_dy = T2[1] - T1[1];
+        const chord_dist = Math.sqrt(chord_dx * chord_dx + chord_dy * chord_dy);
+        const R = chord_dist / 2.0;
         
-        const T2 = alignPoint(nextTravelStart, T1[0] * D[0] + T1[1] * D[1], D);
+        // Calculate arc center exactly like Python
+        // Python: centerX = (T1.X + T2.X) / 2.0
+        // Python: centerY = (T1.Y + T2.Y) / 2.0
+        const centerX = (T1[0] + T2[0]) / 2.0;
+        const centerY = (T1[1] + T2[1]) / 2.0;
         
-        // Calculate chord distance and radius
-        const chordDx = T2[0] - T1[0];
-        const chordDy = T2[1] - T1[1];
-        const chordDist = Math.sqrt(chordDx * chordDx + chordDy * chordDy);
+        // Calculate start angle exactly like Python
+        // Python: start_angle = math.atan2(T1.Y - centerY, T1.X - centerX)
+        const start_angle = Math.atan2(T1[1] - centerY, T1[0] - centerX);
         
-        // Ensure minimum chord distance for proper curve generation
-        if (chordDist < 0.00001) {
-          // If points are too close, just add a direct waypoint
-          waypoints.push({ lat: T2[1], lng: T2[0] });
-        } else {
-          const R = chordDist / 2.0;
-          
-          // Calculate arc center
-          const centerX = (T1[0] + T2[0]) / 2.0;
-          const centerY = (T1[1] + T2[1]) / 2.0;
-          
-          // Calculate start angle
-          const startAngle = Math.atan2(T1[1] - centerY, T1[0] - centerX);
-          
-          // Generate arc points (following Python method)
-          const segments = 12;
+        // Generate arc points exactly like Python
+        const segments = 12; // Python: segments = 12
+        if (turnRight) {
+          // Python: theta = start_angle - (math.pi * j / segments)
           for (let j = 1; j < segments; j++) {
-            let theta: number;
-            if (turnRight) {
-              theta = startAngle - (Math.PI * j / segments);
-            } else {
-              theta = startAngle + (Math.PI * j / segments);
-            }
-            
+            const theta = start_angle - (Math.PI * j / segments);
             const x = centerX + R * Math.cos(theta);
             const y = centerY + R * Math.sin(theta);
-            
             waypoints.push({ lat: y, lng: x });
           }
-          
-          // Add the aligned T2 point
-          waypoints.push({ lat: T2[1], lng: T2[0] });
+        } else {
+          // Python: theta = start_angle + (math.pi * j / segments)
+          for (let j = 1; j < segments; j++) {
+            const theta = start_angle + (Math.PI * j / segments);
+            const x = centerX + R * Math.cos(theta);
+            const y = centerY + R * Math.sin(theta);
+            waypoints.push({ lat: y, lng: x });
+          }
         }
+        
+        // Add the aligned T2 point
+        // Python: route_points.append(arcpy.Point(T2.X, T2.Y))
+        waypoints.push({ lat: T2[1], lng: T2[0] });
       }
     }
 
@@ -372,7 +347,7 @@ async function generateTransectRoute(polygon: any, parameters: any) {
       distance: parameters.distance,
     };
     
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Error generating transect route:", error);
     throw new Error("Failed to generate transect route");
   }
