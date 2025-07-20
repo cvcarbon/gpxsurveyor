@@ -507,7 +507,15 @@ export default function MapContainer({
       {/* Mobile Menu Button - Bottom center, mobile only */}
       <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-[9999] md:hidden">
         <Button
-          onClick={onToggleSidebar}
+          onClick={() => {
+            console.log("Menu button clicked, onToggleSidebar:", onToggleSidebar);
+            if (onToggleSidebar) {
+              onToggleSidebar();
+              console.log("Toggle function called");
+            } else {
+              console.log("No toggle function provided");
+            }
+          }}
           variant="default"
           size="lg"
           className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg rounded-full px-6"
