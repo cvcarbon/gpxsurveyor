@@ -505,7 +505,7 @@ export default function MapContainer({
       />
 
       {/* Mobile Menu Button - Bottom center, mobile only */}
-      <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50 md:hidden">
+      <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-[9999] md:hidden">
         <Button
           onClick={onToggleSidebar}
           variant="default"
