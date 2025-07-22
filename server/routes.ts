@@ -149,29 +149,68 @@ async function generateTransectRoute(polygon: any, parameters: any) {
     // Calculate line spacing (accounting for overlap)
     const effectiveDistance = parameters.distance * (1 - parameters.overlap / 100);
     
-    // Generate transect lines based on bearing
-    const lineCount = Math.ceil((maxX - minX) / (effectiveDistance / 111000)); // Rough conversion to degrees
+    // Calculate polygon extent in the perpendicular direction to survey lines
+    // This ensures complete coverage regardless of bearing
+    const polygonPoints = polygon.geometry.coordinates[0];
+    
+    // Project all polygon points onto the perpendicular axis
+    const perpProjections = polygonPoints.map((point: number[]) => 
+      point[0] * P[0] + point[1] * P[1]
+    );
+    
+    const minProj = Math.min(...perpProjections);
+    const maxProj = Math.max(...perpProjections);
+    const projectedWidth = maxProj - minProj;
+    
+    // Calculate number of lines needed with proper spacing
+    const lineCount = Math.ceil(projectedWidth / (effectiveDistance / 111000)) + 2; // Add buffer lines
+    
+    // Calculate maximum dimension for line length
+    const polygonCenter = turf.center(polygonFeature);
+    const maxDim = Math.max(maxX - minX, maxY - minY);
+    const lineLength = maxDim * 2; // Ensure lines are long enough to cross entire polygon
     
     // First pass: Generate all transect lines
     for (let i = 0; i < lineCount; i++) {
-      const x = minX + (i * effectiveDistance / 111000);
+      // Calculate offset in perpendicular direction
+      const offset = minProj + (i * effectiveDistance / 111000);
       
-      // Create line from south to north of bounding box
-      const line = turf.lineString([
-        [x, minY - 0.01],
-        [x, maxY + 0.01]
-      ]);
+      // Calculate base point for this line
+      const centerCoords = polygonCenter.geometry.coordinates;
+      const currentProj = centerCoords[0] * P[0] + centerCoords[1] * P[1];
+      const shift = offset - currentProj;
+      const basePoint = [
+        centerCoords[0] + shift * P[0],
+        centerCoords[1] + shift * P[1]
+      ];
       
-      // Rotate line by bearing
-      const rotatedLine = turf.transformRotate(line, parameters.bearing, { pivot: turf.center(polygonFeature) });
+      // Create line extending in both directions along survey bearing
+      const halfLen = lineLength / 2;
+      const startPoint = [
+        basePoint[0] - halfLen * D[0],
+        basePoint[1] - halfLen * D[1]
+      ];
+      const endPoint = [
+        basePoint[0] + halfLen * D[0],
+        basePoint[1] + halfLen * D[1]
+      ];
+      
+      const line = turf.lineString([startPoint, endPoint]);
       
       // Clip line to polygon
       try {
-        const clippedLine = turf.lineIntersect(rotatedLine, polygonFeature);
+        const clippedLine = turf.lineIntersect(line, polygonFeature);
         if (clippedLine.features.length >= 2) {
-          // Convert intersection points to line, sort by latitude for consistency
+          // Convert intersection points to line
           const coords = clippedLine.features.map(f => f.geometry.coordinates);
-          const sortedCoords = coords.sort((a, b) => a[1] - b[1]); // Sort by latitude
+          
+          // Sort coordinates along the survey direction
+          const sortedCoords = coords.sort((a, b) => {
+            const projA = a[0] * D[0] + a[1] * D[1];
+            const projB = b[0] * D[0] + b[1] * D[1];
+            return projA - projB;
+          });
+          
           const transectLine = turf.lineString([sortedCoords[0], sortedCoords[sortedCoords.length - 1]]);
           transectLines.push(transectLine);
         }
