@@ -149,6 +149,14 @@ async function generateTransectRoute(polygon: any, parameters: any) {
     // Calculate line spacing (accounting for overlap)
     const effectiveDistance = parameters.distance * (1 - parameters.overlap / 100);
     
+    // Calculate direction vectors exactly like Python reference
+    // Python: dx = math.sin(angle_rad), dy = math.cos(angle_rad)
+    // Python: D = (dx, dy), P = (dy, -dx)
+    const dx = Math.sin(bearingRad);
+    const dy = Math.cos(bearingRad);
+    const D = [dx, dy]; // Direction vector (along transect lines)
+    const P = [dy, -dx]; // Perpendicular vector (across transect spacing)
+    
     // Calculate polygon extent in the perpendicular direction to survey lines
     // This ensures complete coverage regardless of bearing
     const polygonPoints = polygon.geometry.coordinates[0];
@@ -222,14 +230,6 @@ async function generateTransectRoute(polygon: any, parameters: any) {
     // Second pass: Create alternating waypoint path with curved U-turns
     // Following the Python reference method for smooth curve generation
     const turnRadiusMeters = parameters.turnRadius || (parameters.distance * 0.5);
-    
-    // Calculate direction vectors exactly like Python reference
-    // Python: dx = math.sin(angle_rad), dy = math.cos(angle_rad)
-    // Python: D = (dx, dy), P = (dy, -dx)
-    const dx = Math.sin(bearingRad);
-    const dy = Math.cos(bearingRad);
-    const D = [dx, dy]; // Direction vector (along transect lines)
-    const P = [dy, -dx]; // Perpendicular vector (across transect spacing)
     
     // Helper function to align points in survey direction (like Python adjust_point)
     const alignPoint = (point: number[], target: number, directionVector: number[]) => {
