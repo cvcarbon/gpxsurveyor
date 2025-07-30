@@ -132,7 +132,6 @@ ARCGIS_CLIENT_ID=your_arcgis_oauth_app_id # Required for ArcGIS authentication a
 - July 19, 2025. Implemented mobile-responsive design with sidebar always visible on desktop and toggleable via menu button on mobile
 - July 20, 2025. Completed mobile menu button functionality - button only appears when sidebar is closed, uses X button in sidebar header when open
 - July 20, 2025. Fixed curve generation algorithm using geometric turn detection via cross product, ensuring curves always turn outward regardless of bearing angle
-- July 30, 2025. Reverted to working ObjectID-based ArcGIS feature loading approach after confirming the method was correct, just needed updating for new layer URLs
 
 ## User Preferences
 

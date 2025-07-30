@@ -233,7 +233,7 @@ export default function MapContainer({
           const FeatureLayer = (await import("@arcgis/core/layers/FeatureLayer")).default;
           
           // Determine layer type and styling
-          const isLeaseLayer = layerUrl.includes("Lease");
+          const isLeaseLayer = layerUrl.includes("Lease_Boundaries");
           const isBeddingLayer = layerUrl.includes("Bedding_Documentation");
           
           const featureLayer = new FeatureLayer({
@@ -262,6 +262,7 @@ export default function MapContainer({
           // First, get all ObjectIDs - this is reliable and doesn't have pagination issues
           const idsQuery = featureLayer.createQuery();
           idsQuery.where = "1=1";
+          idsQuery.returnIdsOnly = true;
           
           const idsResult = await featureLayer.queryObjectIds(idsQuery);
           const allObjectIds = idsResult;
@@ -314,7 +315,7 @@ export default function MapContainer({
             
             // Manual conversion fallback
             try {
-              const geoJsonFeatures: any[] = [];
+              const geoJsonFeatures = [];
               
               completeFeatureSet.features.forEach((feature, index) => {
                 try {
@@ -386,7 +387,7 @@ export default function MapContainer({
                 console.log("Sample converted feature:", geoJsonFeatures[0]);
                 
                 const geoJsonCollection = {
-                  type: "FeatureCollection" as const,
+                  type: "FeatureCollection",
                   features: geoJsonFeatures
                 };
                 
@@ -492,7 +493,7 @@ export default function MapContainer({
   };
 
   // Expose the clear map function globally so it can be called from the sidebar
-  (window as any).mapClearFunction = handleClearMap;
+  window.mapClearFunction = handleClearMap;
 
   return (
     <div className="relative h-full">
