@@ -443,11 +443,10 @@ export default function MapContainer({
                 
                 // Different styling for different layers
                 const layerStyle = isLeaseLayer ? {
-                  color: '#ff6b35',
+                  color: '#fbbf24', // Yellow color
                   weight: 2,
-                  opacity: 0.8,
-                  fillColor: '#ff6b35',
-                  fillOpacity: 0.3
+                  opacity: 1,
+                  fillOpacity: 0 // No fill
                 } : {
                   color: '#3b82f6',
                   weight: 1,
