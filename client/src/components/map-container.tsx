@@ -234,7 +234,7 @@ export default function MapContainer({
           
           // Determine layer type and styling
           const isLeaseLayer = layerUrl.includes("Lease_Boundaries");
-          const isBeddingLayer = layerUrl.includes("Bedding_Documentation");
+          const isBeddingLayer = layerUrl.includes("Notes");
           
           const featureLayer = new FeatureLayer({
             url: layerUrl,
@@ -311,9 +311,34 @@ export default function MapContainer({
             console.log("Total features count:", completeFeatureSet.features.length);
             console.log("First feature:", completeFeatureSet.features[0]);
             
+            // Coordinate transformation helper functions
+            // Convert Web Mercator (EPSG:3857) to WGS84 (EPSG:4326)
+            const webMercatorToWGS84 = (x: number, y: number): [number, number] => {
+              const earthRadius = 6378137; // WGS84 semi-major axis
+              const originShift = 2 * Math.PI * earthRadius / 2;
+              
+              // Convert from Web Mercator to geographic coordinates
+              const lng = (x / originShift) * 180;
+              let lat = (y / originShift) * 180;
+              lat = 180 / Math.PI * (2 * Math.atan(Math.exp(lat * Math.PI / 180)) - Math.PI / 2);
+              
+              return [lng, lat];
+            };
+            
+            // Transform coordinate arrays recursively
+            const transformCoordinates = (coords: any): any => {
+              if (typeof coords[0] === 'number') {
+                // Single coordinate pair [x, y] -> [lng, lat]
+                return webMercatorToWGS84(coords[0], coords[1]);
+              } else {
+                // Array of coordinates
+                return coords.map((coord: any) => transformCoordinates(coord));
+              }
+            };
+            
             // Skip the built-in toJSON method for synthetic featureSet and go directly to manual conversion
             
-            // Manual conversion fallback
+            // Manual conversion fallback with coordinate transformation
             try {
               const geoJsonFeatures = [];
               
@@ -333,32 +358,45 @@ export default function MapContainer({
                     
                     if (geometryJson && geometryJson.rings && Array.isArray(geometryJson.rings)) {
                       // ArcGIS Polygon with rings -> GeoJSON Polygon
+                      // Transform coordinates from Web Mercator to WGS84
+                      const transformedRings = geometryJson.rings.map((ring: any) => 
+                        transformCoordinates(ring)
+                      );
+                      
                       geoJsonGeometry = {
                         type: "Polygon",
-                        coordinates: geometryJson.rings
+                        coordinates: transformedRings
                       };
                     } else if (geometryJson && geometryJson.paths && Array.isArray(geometryJson.paths)) {
                       // ArcGIS Polyline with paths -> GeoJSON LineString/MultiLineString
+                      const transformedPaths = geometryJson.paths.map((path: any) => 
+                        transformCoordinates(path)
+                      );
+                      
                       if (geometryJson.paths.length === 1) {
                         geoJsonGeometry = {
                           type: "LineString",
-                          coordinates: geometryJson.paths[0]
+                          coordinates: transformedPaths[0]
                         };
                       } else {
                         geoJsonGeometry = {
                           type: "MultiLineString",
-                          coordinates: geometryJson.paths
+                          coordinates: transformedPaths
                         };
                       }
                     } else if (geometryJson && geometryJson.x !== undefined && geometryJson.y !== undefined) {
                       // ArcGIS Point -> GeoJSON Point
+                      const [lng, lat] = webMercatorToWGS84(geometryJson.x, geometryJson.y);
                       geoJsonGeometry = {
                         type: "Point",
-                        coordinates: [geometryJson.x, geometryJson.y]
+                        coordinates: [lng, lat]
                       };
                     } else if (geometryJson && geometryJson.type && geometryJson.coordinates) {
-                      // Already in GeoJSON format
-                      geoJsonGeometry = geometryJson;
+                      // Already in GeoJSON format - still transform in case it's Web Mercator
+                      geoJsonGeometry = {
+                        ...geometryJson,
+                        coordinates: transformCoordinates(geometryJson.coordinates)
+                      };
                     }
                     
                     if (geoJsonGeometry) {
