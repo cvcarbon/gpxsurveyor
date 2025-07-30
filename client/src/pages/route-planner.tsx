@@ -18,8 +18,8 @@ export default function RoutePlanner() {
   const [generatedRoute, setGeneratedRoute] = useState<any>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [arcgisLayers, setArcgisLayers] = useState<Record<string, boolean>>({
-    "https://services.arcgis.com/W1AXaDPef2QMa9kU/arcgis/rest/services/Lease_Boundaries_Leasee_View/FeatureServer/0": true,
-    "https://services.arcgis.com/W1AXaDPef2QMa9kU/arcgis/rest/services/Bedding_Documentation_view/FeatureServer/0": true
+    "https://services.arcgis.com/W1AXaDPef2QMa9kU/arcgis/rest/services/Leases_Filtered_View/FeatureServer/0": true,
+    "https://services.arcgis.com/W1AXaDPef2QMa9kU/arcgis/rest/services/Field_Notes_Filtered_View/FeatureServer/2": true
   });
   const { toast } = useToast();
 

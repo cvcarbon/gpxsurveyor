@@ -222,7 +222,7 @@ export default function MapContainer({
     }
   }, [generatedRoute]);
 
-  // Handle ArcGIS layers - no authentication required since test worked
+  // Handle ArcGIS layers - handle both public and secured layers
   useEffect(() => {
     if (!mapInstanceRef.current) return;
 
@@ -232,15 +232,21 @@ export default function MapContainer({
         try {
           const FeatureLayer = (await import("@arcgis/core/layers/FeatureLayer")).default;
           
-          // Determine layer type and styling
-          const isLeaseLayer = layerUrl.includes("Lease_Boundaries");
-          const isBeddingLayer = layerUrl.includes("Bedding_Documentation");
+          // Determine layer type and styling based on URL patterns
+          const isLeaseLayer = layerUrl.includes("Lease") || layerUrl.includes("lease");
+          const isBeddingLayer = layerUrl.includes("Bedding") || layerUrl.includes("bedding");
+          const isFieldNotesLayer = layerUrl.includes("Field_Notes") || layerUrl.includes("field") || layerUrl.includes("Notes");
+          
+          let layerTitle = "Feature Layer";
+          if (isLeaseLayer) layerTitle = "Lease Information";
+          else if (isBeddingLayer) layerTitle = "Bedding Documentation";
+          else if (isFieldNotesLayer) layerTitle = "Field Notes";
           
           const featureLayer = new FeatureLayer({
             url: layerUrl,
             outFields: ["*"],
             popupTemplate: {
-              title: isLeaseLayer ? "Lease Boundary" : "Bedding Documentation",
+              title: layerTitle,
               content: [
                 {
                   type: "fields",
@@ -255,14 +261,24 @@ export default function MapContainer({
             }
           });
 
-          await featureLayer.load();
+          try {
+            await featureLayer.load();
+            console.log(`Successfully loaded layer: ${layerTitle}`);
+          } catch (loadError: any) {
+            // Check if it's an authentication error
+            if (loadError.message?.includes('Token Required') || loadError.message?.includes('499')) {
+              console.warn(`Layer requires authentication: ${layerTitle}. User must sign in to ArcGIS.`);
+              throw new Error(`This layer requires ArcGIS authentication. Please sign in using the ArcGIS Sign In button in the sidebar.`);
+            } else {
+              throw loadError;
+            }
+          }
           
           console.log("Using ObjectID-based pagination to avoid ArcGIS REST API pagination issues...");
           
           // First, get all ObjectIDs - this is reliable and doesn't have pagination issues
           const idsQuery = featureLayer.createQuery();
           idsQuery.where = "1=1";
-          idsQuery.returnIdsOnly = true;
           
           const idsResult = await featureLayer.queryObjectIds(idsQuery);
           const allObjectIds = idsResult;
