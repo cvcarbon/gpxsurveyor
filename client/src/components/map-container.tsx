@@ -233,7 +233,7 @@ export default function MapContainer({
           const FeatureLayer = (await import("@arcgis/core/layers/FeatureLayer")).default;
           
           // Determine layer type and styling
-          const isLeaseLayer = layerUrl.includes("Lease_Boundaries");
+          const isLeaseLayer = layerUrl.includes("Lease");
           const isBeddingLayer = layerUrl.includes("Bedding_Documentation");
           
           const featureLayer = new FeatureLayer({
@@ -257,65 +257,34 @@ export default function MapContainer({
 
           await featureLayer.load();
           
-          console.log("Using ObjectID-based pagination to avoid ArcGIS REST API pagination issues...");
+          console.log("Querying features directly with geometry...");
           
-          // First, get all ObjectIDs - this is reliable and doesn't have pagination issues
-          const idsQuery = featureLayer.createQuery();
-          idsQuery.where = "1=1";
-          idsQuery.returnIdsOnly = true;
+          // Query all features with geometry directly
+          const query = featureLayer.createQuery();
+          query.where = "1=1";
+          query.outFields = ["*"];
+          query.returnGeometry = true;
           
-          const idsResult = await featureLayer.queryObjectIds(idsQuery);
-          const allObjectIds = idsResult;
-          console.log(`Got ${allObjectIds.length} ObjectIDs to fetch`);
+          try {
+            const featureSet = await featureLayer.queryFeatures(query);
+            const allFeatures = featureSet.features;
+            console.log(`Got ${allFeatures.length} features with geometry`);
           
-          // Now fetch features in batches using ObjectIDs
-          const allFeatures = [];
-          const batchSize = 1000; // Use smaller batches for ObjectID queries
+            // Use direct featureSet
+            const completeFeatureSet = {
+              features: allFeatures,
+              fields: featureSet.fields || [],
+              geometryType: featureSet.geometryType || 'esriGeometryPolygon'
+            };
           
-          for (let i = 0; i < allObjectIds.length; i += batchSize) {
-            const batchIds = allObjectIds.slice(i, i + batchSize);
-            const batchNumber = Math.floor(i / batchSize) + 1;
-            const totalBatches = Math.ceil(allObjectIds.length / batchSize);
-            
-            console.log(`Fetching batch ${batchNumber}/${totalBatches} (${batchIds.length} features)`);
-            
-            const query = featureLayer.createQuery();
-            query.objectIds = batchIds;
-            query.outFields = ["*"];
-            query.returnGeometry = true;
-            
-            try {
-              const featureSet = await featureLayer.queryFeatures(query);
-              const batchFeatures = featureSet.features;
+            import("leaflet").then((L) => {
+              console.log("Complete feature set:", completeFeatureSet);
+              console.log("Total features count:", completeFeatureSet.features.length);
+              console.log("First feature:", completeFeatureSet.features[0]);
               
-              allFeatures.push(...batchFeatures);
-              console.log(`Batch ${batchNumber}: got ${batchFeatures.length} features, total: ${allFeatures.length}/${allObjectIds.length}`);
-              
-            } catch (error) {
-              console.error(`Error fetching batch ${batchNumber}:`, error);
-              // Continue with next batch instead of stopping
-            }
-          }
-          
-          console.log(`Total features loaded: ${allFeatures.length}`);
-          
-          // Create a synthetic featureSet object with all features
-          const completeFeatureSet = {
-            features: allFeatures,
-            fields: [],
-            geometryType: 'esriGeometryPolygon'
-          };
-          
-          import("leaflet").then((L) => {
-            console.log("Complete feature set:", completeFeatureSet);
-            console.log("Total features count:", completeFeatureSet.features.length);
-            console.log("First feature:", completeFeatureSet.features[0]);
-            
-            // Skip the built-in toJSON method for synthetic featureSet and go directly to manual conversion
-            
-            // Manual conversion fallback
-            try {
-              const geoJsonFeatures = [];
+              // Convert features to GeoJSON
+              try {
+                const geoJsonFeatures: any[] = [];
               
               completeFeatureSet.features.forEach((feature, index) => {
                 try {
@@ -387,7 +356,7 @@ export default function MapContainer({
                 console.log("Sample converted feature:", geoJsonFeatures[0]);
                 
                 const geoJsonCollection = {
-                  type: "FeatureCollection",
+                  type: "FeatureCollection" as const,
                   features: geoJsonFeatures
                 };
                 
@@ -441,10 +410,13 @@ export default function MapContainer({
               } else {
                 console.error("No valid features found");
               }
-            } catch (error) {
-              console.error("Manual conversion failed:", error);
-            }
-          });
+              } catch (error) {
+                console.error("Feature conversion failed:", error);
+              }
+            });
+          } catch (error) {
+            console.error("Failed to query features:", error);
+          }
 
         } catch (error) {
           console.error("Error adding ArcGIS layer:", error);
@@ -493,7 +465,7 @@ export default function MapContainer({
   };
 
   // Expose the clear map function globally so it can be called from the sidebar
-  window.mapClearFunction = handleClearMap;
+  (window as any).mapClearFunction = handleClearMap;
 
   return (
     <div className="relative h-full">
