@@ -1,0 +1,10 @@
+{
+  "buildCommand": "npm run build:client",
+  "outputDirectory": "dist/public",
+  "installCommand": "npm install",
+  "rewrites": [
+    { "source": "/api/generate-route", "destination": "/api/generate-route" },
+    { "source": "/api/upload-polygon", "destination": "/api/upload-polygon" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}

@@ -28,12 +28,21 @@ export default function PolygonInput({
 
   const handleFileUpload = async (files: FileList) => {
     try {
-      const formData = new FormData();
-      Array.from(files).forEach((file) => {
-        formData.append("files", file);
+      const file = files[0]; // Process first file
+      
+      // Read file as text for KML files
+      const fileContent = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsText(file);
       });
 
-      const response = await apiFormDataRequest("POST", "/api/upload-polygon", formData);
+      const response = await apiRequest("POST", "/api/upload-polygon", {
+        fileContent,
+        fileName: file.name,
+        fileType: file.name.endsWith('.kml') ? 'kml' : 'unknown',
+      });
       const result = await response.json();
 
       if (result.polygons && result.polygons.length > 0) {
