@@ -47,11 +47,13 @@ export default function Sidebar({
         : "-translate-x-full md:translate-x-0"
     )}>
       {/* Header */}
-      <div className="p-6 border-b border-gray-200">
+      <div className="p-4 border-b border-gray-200">
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold text-gray-900">GPX Surveyor</h1>
-            <p className="text-sm text-gray-500">Autopilot Route Generator</p>
+          <div className="flex items-center gap-3">
+            <img src="/logo.png" alt="CV Carbon" className="h-12 w-auto" />
+            <div>
+              <p className="text-xs text-gray-500">Survey Route Generator</p>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <ArcGISSignIn />

@@ -79,8 +79,8 @@ export default function RoutePlanner() {
   return (
     <>
       <Helmet>
-        <title>GPX Surveyor - Autopilot Route Generator</title>
-        <meta name="description" content="Generate autopilot survey routes with transect lines and GPX export from uploaded or drawn polygons for Garmin chartplotters and drones." />
+        <title>CV Carbon - Survey Route Generator</title>
+        <meta name="description" content="CV Carbon survey route generator - create autopilot routes with transect lines and GPX export for oyster reef surveys." />
       </Helmet>
       
       <div className="flex h-screen overflow-hidden">
