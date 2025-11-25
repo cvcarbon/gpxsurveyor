@@ -9,21 +9,31 @@ export default function ArcGISTest() {
     try {
       setTestResult("Testing ArcGIS connection...");
       
-      // Test basic ArcGIS API loading
-      const esriConfig = await import("@arcgis/core/config");
-      setTestResult("✓ ArcGIS API loaded successfully");
+      // Test basic ArcGIS API loading (esri-leaflet)
+      const Esri = await import("esri-leaflet");
+      setTestResult("✓ esri-leaflet loaded successfully");
       
       // Test feature layer access without authentication
-      const FeatureLayer = (await import("@arcgis/core/layers/FeatureLayer")).default;
+      const { query } = Esri;
       
-      const testLayer = new FeatureLayer({
-        url: "https://services.arcgis.com/W1AXaDPef2QMa9kU/arcgis/rest/services/Lease_Boundaries_Leasee_View/FeatureServer/0"
+      const url = "https://services.arcgis.com/W1AXaDPef2QMa9kU/arcgis/rest/services/Lease_Boundaries_Leasee_View/FeatureServer/0";
+      
+      setTestResult("Querying feature layer...");
+      
+      const count = await new Promise((resolve, reject) => {
+        query({ url })
+          .count((error, count) => {
+            if (error) {
+              reject(error);
+            } else {
+              resolve(count);
+            }
+          });
       });
       
-      await testLayer.load();
-      setTestResult("✓ Feature layer loaded successfully (no auth required)");
+      setTestResult(`✓ Feature layer accessed successfully (Count: ${count})`);
       
-    } catch (error) {
+    } catch (error: any) {
       console.error("ArcGIS test failed:", error);
       setTestResult(`❌ Test failed: ${error.message}`);
     }

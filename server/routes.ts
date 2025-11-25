@@ -64,7 +64,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`Successfully processed ${polygons.length} files`);
       res.json({ files: uploadedFiles, polygons });
-    } catch (error) {
+    } catch (error: any) {
       console.error("File upload error:", error);
       res.status(500).json({ message: "Failed to process uploaded files", error: error.message });
     }
@@ -129,40 +129,132 @@ export async function registerRoutes(app: Express): Promise<Server> {
   return httpServer;
 }
 
-// Route generation algorithm
+// ============================================================================
+// COORDINATE PROJECTION UTILITIES
+// ============================================================================
+
+/**
+ * Get UTM zone number from longitude
+ */
+function getUTMZone(longitude: number): number {
+  return Math.floor((longitude + 180) / 6) + 1;
+}
+
+/**
+ * Project WGS84 (lat/lng) to UTM (meters)
+ * Uses simplified UTM projection formulas
+ */
+function projectToUTM(lng: number, lat: number, zone: number): [number, number] {
+  const a = 6378137; // WGS84 semi-major axis
+  const f = 1 / 298.257223563; // WGS84 flattening
+  const k0 = 0.9996; // UTM scale factor
+  const e = Math.sqrt(2 * f - f * f); // eccentricity
+  const e2 = e * e;
+  const ep2 = e2 / (1 - e2); // e'^2
+  
+  const latRad = lat * Math.PI / 180;
+  const lngRad = lng * Math.PI / 180;
+  const lng0 = ((zone - 1) * 6 - 180 + 3) * Math.PI / 180; // Central meridian
+  
+  const N = a / Math.sqrt(1 - e2 * Math.sin(latRad) * Math.sin(latRad));
+  const T = Math.tan(latRad) * Math.tan(latRad);
+  const C = ep2 * Math.cos(latRad) * Math.cos(latRad);
+  const A = Math.cos(latRad) * (lngRad - lng0);
+  
+  const M = a * ((1 - e2 / 4 - 3 * e2 * e2 / 64 - 5 * e2 * e2 * e2 / 256) * latRad
+    - (3 * e2 / 8 + 3 * e2 * e2 / 32 + 45 * e2 * e2 * e2 / 1024) * Math.sin(2 * latRad)
+    + (15 * e2 * e2 / 256 + 45 * e2 * e2 * e2 / 1024) * Math.sin(4 * latRad)
+    - (35 * e2 * e2 * e2 / 3072) * Math.sin(6 * latRad));
+  
+  const x = k0 * N * (A + (1 - T + C) * A * A * A / 6
+    + (5 - 18 * T + T * T + 72 * C - 58 * ep2) * A * A * A * A * A / 120) + 500000;
+  
+  const y = k0 * (M + N * Math.tan(latRad) * (A * A / 2
+    + (5 - T + 9 * C + 4 * C * C) * A * A * A * A / 24
+    + (61 - 58 * T + T * T + 600 * C - 330 * ep2) * A * A * A * A * A * A / 720));
+  
+  return [x, y];
+}
+
+/**
+ * Project UTM (meters) back to WGS84 (lat/lng)
+ */
+function projectToWGS84(x: number, y: number, zone: number): [number, number] {
+  const a = 6378137;
+  const f = 1 / 298.257223563;
+  const k0 = 0.9996;
+  const e = Math.sqrt(2 * f - f * f);
+  const e2 = e * e;
+  const ep2 = e2 / (1 - e2);
+  const e1 = (1 - Math.sqrt(1 - e2)) / (1 + Math.sqrt(1 - e2));
+  
+  const lng0 = ((zone - 1) * 6 - 180 + 3) * Math.PI / 180;
+  
+  const xAdj = x - 500000;
+  const M = y / k0;
+  
+  const mu = M / (a * (1 - e2 / 4 - 3 * e2 * e2 / 64 - 5 * e2 * e2 * e2 / 256));
+  
+  const phi1 = mu + (3 * e1 / 2 - 27 * e1 * e1 * e1 / 32) * Math.sin(2 * mu)
+    + (21 * e1 * e1 / 16 - 55 * e1 * e1 * e1 * e1 / 32) * Math.sin(4 * mu)
+    + (151 * e1 * e1 * e1 / 96) * Math.sin(6 * mu);
+  
+  const N1 = a / Math.sqrt(1 - e2 * Math.sin(phi1) * Math.sin(phi1));
+  const T1 = Math.tan(phi1) * Math.tan(phi1);
+  const C1 = ep2 * Math.cos(phi1) * Math.cos(phi1);
+  const R1 = a * (1 - e2) / Math.pow(1 - e2 * Math.sin(phi1) * Math.sin(phi1), 1.5);
+  const D = xAdj / (N1 * k0);
+  
+  const lat = phi1 - (N1 * Math.tan(phi1) / R1) * (D * D / 2
+    - (5 + 3 * T1 + 10 * C1 - 4 * C1 * C1 - 9 * ep2) * D * D * D * D / 24
+    + (61 + 90 * T1 + 298 * C1 + 45 * T1 * T1 - 252 * ep2 - 3 * C1 * C1) * D * D * D * D * D * D / 720);
+  
+  const lng = lng0 + (D - (1 + 2 * T1 + C1) * D * D * D / 6
+    + (5 - 2 * C1 + 28 * T1 - 3 * C1 * C1 + 8 * ep2 + 24 * T1 * T1) * D * D * D * D * D / 120) / Math.cos(phi1);
+  
+  return [lng * 180 / Math.PI, lat * 180 / Math.PI];
+}
+
+// ============================================================================
+// ROUTE GENERATION ALGORITHM
+// ============================================================================
+
 async function generateTransectRoute(polygon: any, parameters: any) {
   try {
     // Convert polygon to Turf.js format
     const polygonFeature = turf.polygon(polygon.geometry.coordinates);
     
-    // Calculate bounding box
-    const bbox = turf.bbox(polygonFeature);
-    const [minX, minY, maxX, maxY] = bbox;
+    // Get polygon centroid for UTM zone calculation
+    const centroid = turf.centroid(polygonFeature);
+    const centroidCoords = centroid.geometry.coordinates;
+    const utmZone = getUTMZone(centroidCoords[0]);
     
-    // Convert bearing to radians
+    console.log(`Using UTM Zone ${utmZone} for projection`);
+    
+    // Project all polygon points to UTM for accurate distance calculations
+    const polygonPoints = polygon.geometry.coordinates[0];
+    const projectedPoints: [number, number][] = polygonPoints.map((point: number[]) => 
+      projectToUTM(point[0], point[1], utmZone)
+    );
+    
+    // Project centroid to UTM
+    const centroidUTM = projectToUTM(centroidCoords[0], centroidCoords[1], utmZone);
+    
+    // Convert bearing to radians and calculate direction vectors (matching Python exactly)
     const bearingRad = (parameters.bearing * Math.PI) / 180;
-    
-    // Generate parallel lines
-    const transectLines = [];
-    const waypoints = [];
-    
-    // Calculate line spacing (accounting for overlap)
-    const effectiveDistance = parameters.distance * (1 - parameters.overlap / 100);
-    
-    // Calculate direction vectors exactly like Python reference
-    // Python: dx = math.sin(angle_rad), dy = math.cos(angle_rad)
-    // Python: D = (dx, dy), P = (dy, -dx)
     const dx = Math.sin(bearingRad);
     const dy = Math.cos(bearingRad);
-    const D = [dx, dy]; // Direction vector (along transect lines)
-    const P = [dy, -dx]; // Perpendicular vector (across transect spacing)
+    const D: [number, number] = [dx, dy]; // Direction vector (along transect lines)
+    const P: [number, number] = [dy, -dx]; // Perpendicular vector (across transect spacing)
     
-    // Calculate polygon extent in the perpendicular direction to survey lines
-    // This ensures complete coverage regardless of bearing
-    const polygonPoints = polygon.geometry.coordinates[0];
+    // Calculate line spacing in meters (accounting for overlap)
+    const spacingMeters = parameters.distance * (1 - parameters.overlap / 100);
     
-    // Project all polygon points onto the perpendicular axis
-    const perpProjections = polygonPoints.map((point: number[]) => 
+    // Extension distance beyond polygon boundary (in meters) - like Python's extend_dist
+    const extendDist = 6.096; // 20 feet in meters, matching Python reference
+    
+    // Project all polygon points onto the perpendicular axis to find extent
+    const perpProjections = projectedPoints.map(point => 
       point[0] * P[0] + point[1] * P[1]
     );
     
@@ -170,47 +262,67 @@ async function generateTransectRoute(polygon: any, parameters: any) {
     const maxProj = Math.max(...perpProjections);
     const projectedWidth = maxProj - minProj;
     
-    // Calculate number of lines needed with proper spacing
-    const lineCount = Math.ceil(projectedWidth / (effectiveDistance / 111000)) + 2; // Add buffer lines
+    // Calculate number of lines needed
+    const lineCount = Math.ceil(projectedWidth / spacingMeters) + 1;
     
-    // Calculate maximum dimension for line length
-    const polygonCenter = turf.center(polygonFeature);
-    const maxDim = Math.max(maxX - minX, maxY - minY);
-    const lineLength = maxDim * 2; // Ensure lines are long enough to cross entire polygon
+    console.log(`Generating ${lineCount} survey lines with ${spacingMeters}m spacing`);
     
-    // First pass: Generate all transect lines
+    // Calculate maximum dimension for line length (in UTM meters)
+    const xCoords = projectedPoints.map(p => p[0]);
+    const yCoords = projectedPoints.map(p => p[1]);
+    const extentWidth = Math.max(...xCoords) - Math.min(...xCoords);
+    const extentHeight = Math.max(...yCoords) - Math.min(...yCoords);
+    const maxDim = Math.hypot(extentWidth, extentHeight);
+    const lineLength = maxDim * 2;
+    
+    // Create polygon geometry for clipping (in UTM)
+    const projectedPolygonCoords = projectedPoints.map(p => [p[0], p[1]]);
+    // Ensure polygon is closed
+    if (projectedPolygonCoords[0][0] !== projectedPolygonCoords[projectedPolygonCoords.length - 1][0] ||
+        projectedPolygonCoords[0][1] !== projectedPolygonCoords[projectedPolygonCoords.length - 1][1]) {
+      projectedPolygonCoords.push([...projectedPolygonCoords[0]]);
+    }
+    const projectedPolygon = turf.polygon([projectedPolygonCoords]);
+    
+    // First pass: Generate all transect lines (in UTM coordinates)
+    interface SurveyLine {
+      start: [number, number];
+      end: [number, number];
+    }
+    const surveyLines: SurveyLine[] = [];
+    
     for (let i = 0; i < lineCount; i++) {
-      // Calculate offset in perpendicular direction
-      const offset = minProj + (i * effectiveDistance / 111000);
+      // Calculate offset in perpendicular direction (in meters)
+      const offset = minProj + (i * spacingMeters);
       
       // Calculate base point for this line
-      const centerCoords = polygonCenter.geometry.coordinates;
-      const currentProj = centerCoords[0] * P[0] + centerCoords[1] * P[1];
+      const currentProj = centroidUTM[0] * P[0] + centroidUTM[1] * P[1];
       const shift = offset - currentProj;
-      const basePoint = [
-        centerCoords[0] + shift * P[0],
-        centerCoords[1] + shift * P[1]
+      const basePoint: [number, number] = [
+        centroidUTM[0] + shift * P[0],
+        centroidUTM[1] + shift * P[1]
       ];
       
       // Create line extending in both directions along survey bearing
       const halfLen = lineLength / 2;
-      const startPoint = [
+      const startPoint: [number, number] = [
         basePoint[0] - halfLen * D[0],
         basePoint[1] - halfLen * D[1]
       ];
-      const endPoint = [
+      const endPoint: [number, number] = [
         basePoint[0] + halfLen * D[0],
         basePoint[1] + halfLen * D[1]
       ];
       
       const line = turf.lineString([startPoint, endPoint]);
       
-      // Clip line to polygon
+      // Clip line to polygon using intersection
       try {
-        const clippedLine = turf.lineIntersect(line, polygonFeature);
-        if (clippedLine.features.length >= 2) {
-          // Convert intersection points to line
-          const coords = clippedLine.features.map(f => f.geometry.coordinates);
+        const intersections = turf.lineIntersect(line, projectedPolygon);
+        
+        if (intersections.features.length >= 2) {
+          // Get intersection points and sort along survey direction
+          const coords = intersections.features.map(f => f.geometry.coordinates as [number, number]);
           
           // Sort coordinates along the survey direction
           const sortedCoords = coords.sort((a, b) => {
@@ -219,133 +331,125 @@ async function generateTransectRoute(polygon: any, parameters: any) {
             return projA - projB;
           });
           
-          const transectLine = turf.lineString([sortedCoords[0], sortedCoords[sortedCoords.length - 1]]);
-          transectLines.push(transectLine);
+          // Get first and last intersection points
+          const lineStart = sortedCoords[0];
+          const lineEnd = sortedCoords[sortedCoords.length - 1];
+          
+          // Extend the line slightly beyond the polygon (like Python's extend_dist)
+          const lineDx = lineEnd[0] - lineStart[0];
+          const lineDy = lineEnd[1] - lineStart[1];
+          const lineLen = Math.hypot(lineDx, lineDy);
+          
+          if (lineLen > 0) {
+            const dirX = lineDx / lineLen;
+            const dirY = lineDy / lineLen;
+            
+            const extendedStart: [number, number] = [
+              lineStart[0] - dirX * extendDist,
+              lineStart[1] - dirY * extendDist
+            ];
+            const extendedEnd: [number, number] = [
+              lineEnd[0] + dirX * extendDist,
+              lineEnd[1] + dirY * extendDist
+            ];
+            
+            surveyLines.push({
+              start: extendedStart,
+              end: extendedEnd
+            });
+          }
         }
       } catch (e) {
         console.warn("Failed to clip line to polygon:", e);
       }
     }
-
-    // Second pass: Create alternating waypoint path with curved U-turns
-    // Following the Python reference method for smooth curve generation
-    const turnRadiusMeters = parameters.turnRadius || (parameters.distance * 0.5);
     
-    // Helper function to align points in survey direction (like Python adjust_point)
-    const alignPoint = (point: number[], target: number, directionVector: number[]) => {
-      const current = point[0] * directionVector[0] + point[1] * directionVector[1];
-      const shift = target - current;
-      return [
-        point[0] + shift * directionVector[0],
-        point[1] + shift * directionVector[1]
-      ];
-    };
+    console.log(`Generated ${surveyLines.length} survey lines after clipping`);
     
-    // Build route with alternating pattern and curved turns
-    for (let i = 0; i < transectLines.length; i++) {
-      const line = transectLines[i];
-      const lineCoords = line.geometry.coordinates;
-      const start = lineCoords[0];
-      const end = lineCoords[1];
+    // Second pass: Build route with alternating pattern and smooth U-turns
+    // Following Python reference exactly for curve generation
+    const routePointsUTM: [number, number][] = [];
+    
+    for (let idx = 0; idx < surveyLines.length; idx++) {
+      const line = surveyLines[idx];
       
-      let travelStart: number[], travelEnd: number[];
+      // Determine travel direction (alternating pattern)
+      let travelStart: [number, number];
+      let travelEnd: [number, number];
       
-      if (i % 2 === 0) {
-        // Even lines: go from start to end
-        travelStart = start;
-        travelEnd = end;
+      if (idx % 2 === 0) {
+        travelStart = line.start;
+        travelEnd = line.end;
       } else {
-        // Odd lines: go from end to start (alternating pattern)
-        travelStart = end;
-        travelEnd = start;
+        travelStart = line.end;
+        travelEnd = line.start;
       }
       
-      if (i === 0) {
-        // First line: add waypoints along the entire line
-        const lineString = turf.lineString([travelStart, travelEnd]);
-        const lineLength = turf.length(lineString, { units: 'kilometers' });
-        const numWaypoints = Math.max(2, Math.ceil(lineLength * 10)); // About 10 waypoints per km
-        
-        for (let j = 0; j <= numWaypoints; j++) {
-          const progress = j / numWaypoints;
-          const point = turf.along(lineString, progress * lineLength, { units: 'kilometers' });
-          waypoints.push({ lat: point.geometry.coordinates[1], lng: point.geometry.coordinates[0] });
-        }
+      // Add line endpoints to route
+      if (idx === 0) {
+        // First line: add both start and end
+        routePointsUTM.push(travelStart);
+        routePointsUTM.push(travelEnd);
       } else {
-        // For subsequent lines, add waypoints along the line (start is connected by curve)
-        const lineString = turf.lineString([travelStart, travelEnd]);
-        const lineLength = turf.length(lineString, { units: 'kilometers' });
-        const numWaypoints = Math.max(2, Math.ceil(lineLength * 10)); // About 10 waypoints per km
-        
-        // Skip the first waypoint (it's connected by the curve) and add the rest
-        for (let j = 1; j <= numWaypoints; j++) {
-          const progress = j / numWaypoints;
-          const point = turf.along(lineString, progress * lineLength, { units: 'kilometers' });
-          waypoints.push({ lat: point.geometry.coordinates[1], lng: point.geometry.coordinates[0] });
-        }
+        // Subsequent lines: only add end (start is connected by curve)
+        routePointsUTM.push(travelEnd);
       }
       
-      // Add curved turn between this line and the next
-      if (i < transectLines.length - 1) {
-        const nextLine = transectLines[i + 1];
-        const nextStart = nextLine.geometry.coordinates[0];
-        const nextEnd = nextLine.geometry.coordinates[1];
+      // Generate curved turn to next line (if not the last line)
+      if (idx < surveyLines.length - 1) {
+        const turnRight = (idx % 2 === 0); // Matches Python: turn_right = (idx % 2 == 0)
         
-        // Determine next line's travel direction
-        let nextTravelStart: number[];
-        if ((i + 1) % 2 === 0) {
-          nextTravelStart = nextStart;
+        const nextLine = surveyLines[idx + 1];
+        
+        // Determine next line's start point based on alternating pattern
+        let nextStart: [number, number];
+        if ((idx + 1) % 2 === 0) {
+          nextStart = nextLine.start;
         } else {
-          nextTravelStart = nextEnd;
+          nextStart = nextLine.end;
         }
         
-        // Calculate geometric turn direction using cross product
-        // This ensures curves always turn outward regardless of bearing
-        const currentLineVec = [travelEnd[0] - travelStart[0], travelEnd[1] - travelStart[1]];
-        const nextLineVec = [nextTravelStart[0] - travelEnd[0], nextTravelStart[1] - travelEnd[1]];
-        
-        // Cross product to determine turn direction 
-        const crossProduct = currentLineVec[0] * nextLineVec[1] - currentLineVec[1] * nextLineVec[0];
-        // Invert the logic to ensure outward curves
-        const turnRight = crossProduct < 0;
-        
-        // Following Python method for point alignment
+        // Following Python exactly:
+        // P_end = travel_end
+        // P_next = next_start
+        // p_end_D = P_end.X * D[0] + P_end.Y * D[1]
         const P_end = travelEnd;
-        const P_next = nextTravelStart;
+        const P_next = nextStart;
         const p_end_D = P_end[0] * D[0] + P_end[1] * D[1];
         
+        // Adjust P_next to align with P_end in the survey direction
+        // Python: def adjust_point(P, D, target): current = P.X * D[0] + P.Y * D[1]; shift = target - current; return Point(P.X + shift * D[0], P.Y + shift * D[1])
+        const current = P_next[0] * D[0] + P_next[1] * D[1];
+        const shift = p_end_D - current;
         const T1 = P_end;
-        const T2 = alignPoint(P_next, p_end_D, D);
+        const T2: [number, number] = [
+          P_next[0] + shift * D[0],
+          P_next[1] + shift * D[1]
+        ];
         
-        // Calculate chord distance and radius exactly like Python
-        // Python: chord_dx = T2.X - T1.X
-        // Python: chord_dy = T2.Y - T1.Y 
-        // Python: chord_dist = math.hypot(chord_dx, chord_dy)
-        // Python: R = chord_dist / 2.0
+        // Calculate chord distance and radius (Python: R = chord_dist / 2.0)
         const chord_dx = T2[0] - T1[0];
         const chord_dy = T2[1] - T1[1];
-        const chord_dist = Math.sqrt(chord_dx * chord_dx + chord_dy * chord_dy);
+        const chord_dist = Math.hypot(chord_dx, chord_dy);
         const R = chord_dist / 2.0;
         
-        // Calculate arc center exactly like Python
-        // Python: centerX = (T1.X + T2.X) / 2.0
-        // Python: centerY = (T1.Y + T2.Y) / 2.0
+        // Calculate arc center (midpoint of T1 and T2)
         const centerX = (T1[0] + T2[0]) / 2.0;
         const centerY = (T1[1] + T2[1]) / 2.0;
         
-        // Calculate start angle exactly like Python
-        // Python: start_angle = math.atan2(T1.Y - centerY, T1.X - centerX)
+        // Calculate start angle
         const start_angle = Math.atan2(T1[1] - centerY, T1[0] - centerX);
         
-        // Generate arc points exactly like Python
-        const segments = 12; // Python: segments = 12
+        // Generate arc points (Python: segments = 12)
+        const segments = 12;
+        
         if (turnRight) {
           // Python: theta = start_angle - (math.pi * j / segments)
           for (let j = 1; j < segments; j++) {
             const theta = start_angle - (Math.PI * j / segments);
             const x = centerX + R * Math.cos(theta);
             const y = centerY + R * Math.sin(theta);
-            waypoints.push({ lat: y, lng: x });
+            routePointsUTM.push([x, y]);
           }
         } else {
           // Python: theta = start_angle + (math.pi * j / segments)
@@ -353,29 +457,50 @@ async function generateTransectRoute(polygon: any, parameters: any) {
             const theta = start_angle + (Math.PI * j / segments);
             const x = centerX + R * Math.cos(theta);
             const y = centerY + R * Math.sin(theta);
-            waypoints.push({ lat: y, lng: x });
+            routePointsUTM.push([x, y]);
           }
         }
         
-        // Add the aligned T2 point
-        // Python: route_points.append(arcpy.Point(T2.X, T2.Y))
-        waypoints.push({ lat: T2[1], lng: T2[0] });
+        // Add the aligned T2 point (connects to next line)
+        routePointsUTM.push(T2);
       }
     }
-
     
-    // Calculate total distance
+    console.log(`Generated ${routePointsUTM.length} route points`);
+    
+    // Convert route points back to WGS84
+    const waypoints = routePointsUTM.map(point => {
+      const [lng, lat] = projectToWGS84(point[0], point[1], utmZone);
+      return { lat, lng };
+    });
+    
+    // Convert survey lines to GeoJSON for display (in WGS84)
+    const transectLines = surveyLines.map(line => {
+      const startWGS = projectToWGS84(line.start[0], line.start[1], utmZone);
+      const endWGS = projectToWGS84(line.end[0], line.end[1], utmZone);
+      return turf.lineString([startWGS, endWGS]);
+    });
+    
+    // Calculate total distance (in meters)
     let totalDistance = 0;
-    for (const line of transectLines) {
-      totalDistance += turf.length(line, { units: "meters" });
+    
+    // Add transect line distances
+    for (const line of surveyLines) {
+      const dx = line.end[0] - line.start[0];
+      const dy = line.end[1] - line.start[1];
+      totalDistance += Math.hypot(dx, dy);
     }
     
-    // Add turn distances
-    const turnDistance = waypoints.length * parameters.turnRadius * Math.PI / 2;
-    totalDistance += turnDistance;
+    // Add turn distances (approximate arc lengths)
+    // Each turn is a semicircle with radius = spacing / 2
+    const turnRadius = spacingMeters / 2;
+    const turnArcLength = Math.PI * turnRadius; // Half circle
+    totalDistance += (surveyLines.length - 1) * turnArcLength;
     
     // Estimate time (assuming 5 m/s average speed)
     const estimatedTime = Math.round(totalDistance / 5 / 60);
+    
+    console.log(`Total distance: ${Math.round(totalDistance)}m, Estimated time: ${estimatedTime} minutes`);
     
     return {
       transectLines,
@@ -392,7 +517,10 @@ async function generateTransectRoute(polygon: any, parameters: any) {
   }
 }
 
-// File parsing utilities
+// ============================================================================
+// FILE PARSING UTILITIES
+// ============================================================================
+
 const parseKML = async (buffer: Buffer): Promise<{ polygon: any; data: any }> => {
   const parser = new xml2js.Parser();
   

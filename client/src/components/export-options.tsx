@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Download, FileText, Share, Save } from "lucide-react";
+import { Download } from "lucide-react";
 import { generateGPX, generateKML } from "@/lib/gpx-builder";
 
 interface ExportOptionsProps {
@@ -100,27 +100,6 @@ export default function ExportOptions({
           <Download className="h-4 w-4 mr-2" />
           Export as KML
         </Button>
-
-        <div className="flex space-x-2">
-          <Button
-            disabled={!hasRoute}
-            variant="outline"
-            size="sm"
-            className={`flex-1 ${!hasRoute ? 'text-gray-400 border-gray-200' : ''}`}
-          >
-            <Share className="h-4 w-4 mr-2" />
-            Share
-          </Button>
-          <Button
-            disabled={!hasRoute}
-            variant="outline"
-            size="sm"
-            className={`flex-1 ${!hasRoute ? 'text-gray-400 border-gray-200' : ''}`}
-          >
-            <Save className="h-4 w-4 mr-2" />
-            Save
-          </Button>
-        </div>
       </CardContent>
     </Card>
   );

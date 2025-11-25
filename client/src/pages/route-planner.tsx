@@ -4,6 +4,7 @@ import Sidebar from "@/components/sidebar";
 import MapContainer from "@/components/map-container";
 import { useToast } from "@/hooks/use-toast";
 import { RouteParameters } from "@shared/schema";
+import { useArcGISAuth, LEASE_LAYER_ADMIN, LEASE_LAYER_PUBLIC } from "@/lib/arcgis-auth";
 
 export default function RoutePlanner() {
   const [sidebarOpen, setSidebarOpen] = useState(true); // Start open, will be responsive
@@ -17,10 +18,18 @@ export default function RoutePlanner() {
   });
   const [generatedRoute, setGeneratedRoute] = useState<any>(null);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [arcgisLayers, setArcgisLayers] = useState<Record<string, boolean>>({
-    "https://services.arcgis.com/W1AXaDPef2QMa9kU/arcgis/rest/services/Leases_Filtered_View/FeatureServer/0": true,
-    "https://services.arcgis.com/W1AXaDPef2QMa9kU/arcgis/rest/services/Field_Notes_Filtered_View/FeatureServer/2": true
-  });
+  const { isAdmin, isAuthenticated } = useArcGISAuth();
+  
+  // Always show the lease layer - use admin layer if authenticated with admin access
+  const leaseLayerUrl = isAdmin ? LEASE_LAYER_ADMIN : LEASE_LAYER_PUBLIC;
+  const [arcgisLayers, setArcgisLayers] = useState<Record<string, boolean>>({});
+  
+  // Update layers when auth status changes
+  useEffect(() => {
+    const url = isAdmin ? LEASE_LAYER_ADMIN : LEASE_LAYER_PUBLIC;
+    setArcgisLayers({ [url]: true });
+  }, [isAdmin, isAuthenticated]);
+  
   const { toast } = useToast();
 
   // Handle responsive sidebar behavior
@@ -67,13 +76,6 @@ export default function RoutePlanner() {
     });
   };
 
-  const handleLayerToggle = (layerUrl: string, visible: boolean) => {
-    setArcgisLayers(prev => ({
-      ...prev,
-      [layerUrl]: visible
-    }));
-  };
-
   return (
     <>
       <Helmet>
@@ -107,8 +109,6 @@ export default function RoutePlanner() {
           isGenerating={isGenerating}
           onRouteGenerated={handleRouteGenerated}
           onError={handleError}
-          onLayerToggle={handleLayerToggle}
-          layerVisibility={arcgisLayers}
         />
         
         <div className="flex-1 relative">

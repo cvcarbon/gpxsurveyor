@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Expand, Trash2, Layers, ZoomIn, ZoomOut, Menu } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useArcGISAuth } from "@/lib/arcgis-auth";
+import { useArcGISAuth, LEASE_LAYER_ADMIN, LEASE_LAYER_PUBLIC } from "@/lib/arcgis-auth";
 
 interface MapContainerProps {
   polygon: any;
@@ -222,276 +222,115 @@ export default function MapContainer({
     }
   }, [generatedRoute]);
 
-  // Handle ArcGIS layers - no authentication required since test worked
+  // Handle ArcGIS layers using esri-leaflet
   useEffect(() => {
     if (!mapInstanceRef.current) return;
 
-    Object.entries(arcgisLayers).forEach(async ([layerUrl, visible]) => {
-      if (visible && !arcgisLayersRef.current[layerUrl]) {
-        // Add ArcGIS layer
+    const loadLayers = async () => {
+      // Dynamic import of esri-leaflet to work with the dynamically imported Leaflet
+      const EsriLeaflet = await import("esri-leaflet");
+      
+      // Get authentication token if user is authenticated
+      let token: string | null = null;
+      if (isAuthenticated) {
         try {
-          const FeatureLayer = (await import("@arcgis/core/layers/FeatureLayer")).default;
+          const IdentityManager = (await import("@arcgis/core/identity/IdentityManager")).default;
+          const credential = await IdentityManager.checkSignInStatus("https://www.arcgis.com");
+          if (credential && credential.token) {
+            token = credential.token;
+            console.log("Using authenticated token for ArcGIS layers");
+          }
+        } catch (error) {
+          console.log("No authentication token available, using public access");
+        }
+      }
+
+      Object.entries(arcgisLayers).forEach(([layerUrl, visible]) => {
+        if (visible && !arcgisLayersRef.current[layerUrl]) {
+          console.log(`Adding ArcGIS layer: ${layerUrl}`);
           
           // Determine layer type and styling
-          const isLeaseLayer = layerUrl.includes("Lease_Boundaries");
-          const isBeddingLayer = layerUrl.includes("Notes");
+          const isLeaseLayer = layerUrl.includes("Lease") || layerUrl === LEASE_LAYER_ADMIN || layerUrl === LEASE_LAYER_PUBLIC;
           
-          const featureLayer = new FeatureLayer({
-            url: layerUrl,
-            outFields: ["*"],
-            popupTemplate: {
-              title: isLeaseLayer ? "Lease Boundary" : "Bedding Documentation",
-              content: [
-                {
-                  type: "fields",
-                  fieldInfos: [
-                    {
-                      fieldName: "OBJECTID",
-                      label: "Object ID"
-                    }
-                  ]
-                }
-              ]
-            }
-          });
+          try {
+            // Create feature layer using esri-leaflet
+            const layerOptions: any = {
+              url: layerUrl,
+              // Use simplifyFactor for performance with large datasets
+              simplifyFactor: 0.5,
+              // Precision for coordinates
+              precision: 6,
+            };
 
-          await featureLayer.load();
-          
-          console.log("Using ObjectID-based pagination to avoid ArcGIS REST API pagination issues...");
-          
-          // First, get all ObjectIDs - this is reliable and doesn't have pagination issues
-          const idsQuery = featureLayer.createQuery();
-          idsQuery.where = "1=1";
-          idsQuery.returnIdsOnly = true;
-          
-          const idsResult = await featureLayer.queryObjectIds(idsQuery);
-          const allObjectIds = idsResult;
-          console.log(`Got ${allObjectIds.length} ObjectIDs to fetch`);
-          
-          // Now fetch features in batches using ObjectIDs
-          const allFeatures = [];
-          const batchSize = 1000; // Use smaller batches for ObjectID queries
-          
-          for (let i = 0; i < allObjectIds.length; i += batchSize) {
-            const batchIds = allObjectIds.slice(i, i + batchSize);
-            const batchNumber = Math.floor(i / batchSize) + 1;
-            const totalBatches = Math.ceil(allObjectIds.length / batchSize);
-            
-            console.log(`Fetching batch ${batchNumber}/${totalBatches} (${batchIds.length} features)`);
-            
-            const query = featureLayer.createQuery();
-            query.objectIds = batchIds;
-            query.outFields = ["*"];
-            query.returnGeometry = true;
-            
-            try {
-              const featureSet = await featureLayer.queryFeatures(query);
-              const batchFeatures = featureSet.features;
-              
-              allFeatures.push(...batchFeatures);
-              console.log(`Batch ${batchNumber}: got ${batchFeatures.length} features, total: ${allFeatures.length}/${allObjectIds.length}`);
-              
-            } catch (error) {
-              console.error(`Error fetching batch ${batchNumber}:`, error);
-              // Continue with next batch instead of stopping
+            // Add token if authenticated
+            if (token) {
+              layerOptions.token = token;
             }
+
+            const layer = EsriLeaflet.featureLayer(layerOptions);
+            
+            // Style configuration - esri-leaflet uses setStyle method
+            const layerStyle = isLeaseLayer ? {
+              color: '#fbbf24', // Yellow color
+              weight: 2,
+              opacity: 1,
+              fillOpacity: 0 // No fill
+            } : {
+              color: '#3b82f6', // Blue color
+              weight: 1,
+              opacity: 0.7,
+              fillColor: '#3b82f6',
+              fillOpacity: 0.2
+            };
+            
+            layer.setStyle(layerStyle);
+            
+            // Bind popups on each feature
+            layer.bindPopup((featureLayer: any) => {
+              const props = featureLayer.feature.properties;
+              if (!props) return '';
+              
+              const popupContent = Object.entries(props)
+                .filter(([key, value]) => value !== null && value !== undefined && key !== 'OBJECTID' && key !== 'Shape__Area' && key !== 'Shape__Length')
+                .map(([key, value]) => `<strong>${key}:</strong> ${value}`)
+                .join('<br>');
+              
+              const title = isLeaseLayer ? "Lease Boundary" : "Bedding Documentation";
+              return `<strong>${title}</strong><br>${popupContent}`;
+            });
+
+            // Add event listeners for debugging
+            layer.on('loading', () => {
+              console.log(`Loading features from ${layerUrl}...`);
+            });
+            
+            layer.on('load', () => {
+              console.log(`Finished loading features from ${layerUrl}`);
+            });
+            
+            layer.on('error', (e: any) => {
+              console.error(`Error loading layer ${layerUrl}:`, e);
+            });
+
+            // Add to map
+            layer.addTo(mapInstanceRef.current);
+            arcgisLayersRef.current[layerUrl] = layer;
+            console.log(`Successfully added layer ${layerUrl}`);
+            
+          } catch (error) {
+            console.error(`Error adding ArcGIS layer ${layerUrl}:`, error);
           }
-          
-          console.log(`Total features loaded: ${allFeatures.length}`);
-          
-          // Create a synthetic featureSet object with all features
-          const completeFeatureSet = {
-            features: allFeatures,
-            fields: [],
-            geometryType: 'esriGeometryPolygon'
-          };
-          
-          import("leaflet").then((L) => {
-            console.log("Complete feature set:", completeFeatureSet);
-            console.log("Total features count:", completeFeatureSet.features.length);
-            console.log("First feature:", completeFeatureSet.features[0]);
-            
-            // Coordinate transformation helper functions
-            // Convert Web Mercator (EPSG:3857) to WGS84 (EPSG:4326)
-            const webMercatorToWGS84 = (x: number, y: number): [number, number] => {
-              const earthRadius = 6378137; // WGS84 semi-major axis
-              const originShift = 2 * Math.PI * earthRadius / 2;
-              
-              // Convert from Web Mercator to geographic coordinates
-              const lng = (x / originShift) * 180;
-              let lat = (y / originShift) * 180;
-              lat = 180 / Math.PI * (2 * Math.atan(Math.exp(lat * Math.PI / 180)) - Math.PI / 2);
-              
-              return [lng, lat];
-            };
-            
-            // Transform coordinate arrays recursively
-            const transformCoordinates = (coords: any): any => {
-              if (typeof coords[0] === 'number') {
-                // Single coordinate pair [x, y] -> [lng, lat]
-                return webMercatorToWGS84(coords[0], coords[1]);
-              } else {
-                // Array of coordinates
-                return coords.map((coord: any) => transformCoordinates(coord));
-              }
-            };
-            
-            // Skip the built-in toJSON method for synthetic featureSet and go directly to manual conversion
-            
-            // Manual conversion fallback with coordinate transformation
-            try {
-              const geoJsonFeatures = [];
-              
-              completeFeatureSet.features.forEach((feature, index) => {
-                try {
-                  if (feature.geometry) {
-                    // Get the geometry as JSON and convert from ArcGIS to GeoJSON format
-                    const geometryJson = feature.geometry.toJSON();
-                    
-                    // Log first few geometries to understand structure
-                    if (index < 3) {
-                      console.log(`Sample geometry ${index}:`, geometryJson);
-                    }
-                    
-                    // Convert ArcGIS polygon format to GeoJSON format
-                    let geoJsonGeometry = null;
-                    
-                    if (geometryJson && geometryJson.rings && Array.isArray(geometryJson.rings)) {
-                      // ArcGIS Polygon with rings -> GeoJSON Polygon
-                      // Transform coordinates from Web Mercator to WGS84
-                      const transformedRings = geometryJson.rings.map((ring: any) => 
-                        transformCoordinates(ring)
-                      );
-                      
-                      geoJsonGeometry = {
-                        type: "Polygon",
-                        coordinates: transformedRings
-                      };
-                    } else if (geometryJson && geometryJson.paths && Array.isArray(geometryJson.paths)) {
-                      // ArcGIS Polyline with paths -> GeoJSON LineString/MultiLineString
-                      const transformedPaths = geometryJson.paths.map((path: any) => 
-                        transformCoordinates(path)
-                      );
-                      
-                      if (geometryJson.paths.length === 1) {
-                        geoJsonGeometry = {
-                          type: "LineString",
-                          coordinates: transformedPaths[0]
-                        };
-                      } else {
-                        geoJsonGeometry = {
-                          type: "MultiLineString",
-                          coordinates: transformedPaths
-                        };
-                      }
-                    } else if (geometryJson && geometryJson.x !== undefined && geometryJson.y !== undefined) {
-                      // ArcGIS Point -> GeoJSON Point
-                      const [lng, lat] = webMercatorToWGS84(geometryJson.x, geometryJson.y);
-                      geoJsonGeometry = {
-                        type: "Point",
-                        coordinates: [lng, lat]
-                      };
-                    } else if (geometryJson && geometryJson.type && geometryJson.coordinates) {
-                      // Already in GeoJSON format - still transform in case it's Web Mercator
-                      geoJsonGeometry = {
-                        ...geometryJson,
-                        coordinates: transformCoordinates(geometryJson.coordinates)
-                      };
-                    }
-                    
-                    if (geoJsonGeometry) {
-                      const geoJsonFeature = {
-                        type: "Feature",
-                        geometry: geoJsonGeometry,
-                        properties: feature.attributes || {}
-                      };
-                      geoJsonFeatures.push(geoJsonFeature);
-                      
-                      // Log successful conversion for first few features
-                      if (index < 3) {
-                        console.log(`Converted geometry ${index}:`, geoJsonGeometry);
-                      }
-                    } else {
-                      console.warn(`Could not convert geometry for feature ${index}:`, geometryJson);
-                    }
-                  }
-                } catch (featureError) {
-                  console.error(`Error processing feature ${index}:`, featureError);
-                }
-              });
-              
-              if (geoJsonFeatures.length > 0) {
-                console.log(`Successfully converted ${geoJsonFeatures.length} features`);
-                console.log("Sample converted feature:", geoJsonFeatures[0]);
-                
-                const geoJsonCollection = {
-                  type: "FeatureCollection",
-                  features: geoJsonFeatures
-                };
-                
-                // Validate the collection structure
-                const isValidCollection = geoJsonCollection.type === "FeatureCollection" && 
-                                        Array.isArray(geoJsonCollection.features) &&
-                                        geoJsonFeatures.every(f => f.type === "Feature" && f.geometry && f.properties);
-                
-                console.log("Collection is valid:", isValidCollection);
-                
-                if (!isValidCollection) {
-                  console.error("Invalid GeoJSON collection structure");
-                  return;
-                }
-                
-                // Different styling for different layers
-                const layerStyle = isLeaseLayer ? {
-                  color: '#fbbf24', // Yellow color
-                  weight: 2,
-                  opacity: 1,
-                  fillOpacity: 0 // No fill
-                } : {
-                  color: '#3b82f6',
-                  weight: 1,
-                  opacity: 0.7,
-                  fillColor: '#3b82f6',
-                  fillOpacity: 0.2
-                };
-                
-                const geoJsonLayer = L.geoJSON(geoJsonCollection, {
-                  style: layerStyle,
-                  onEachFeature: (feature, layer) => {
-                    if (feature.properties) {
-                      const popupContent = Object.entries(feature.properties)
-                        .filter(([key, value]) => value !== null && value !== undefined)
-                        .map(([key, value]) => `<strong>${key}:</strong> ${value}`)
-                        .join('<br>');
-                      layer.bindPopup(popupContent);
-                    }
-                  }
-                });
-                
-                console.log(`Created Leaflet layer with ${geoJsonLayer.getLayers().length} features`);
-                console.log("Layer bounds:", geoJsonLayer.getBounds());
-                
-                arcgisLayersRef.current[layerUrl] = geoJsonLayer;
-                geoJsonLayer.addTo(mapInstanceRef.current);
-                
-                console.log(`Layer successfully added to map. Total ArcGIS layers: ${Object.keys(arcgisLayersRef.current).length}`);
-              } else {
-                console.error("No valid features found");
-              }
-            } catch (error) {
-              console.error("Manual conversion failed:", error);
-            }
-          });
 
-        } catch (error) {
-          console.error("Error adding ArcGIS layer:", error);
+        } else if (!visible && arcgisLayersRef.current[layerUrl]) {
+          // Remove ArcGIS layer
+          console.log(`Removing ArcGIS layer: ${layerUrl}`);
+          mapInstanceRef.current.removeLayer(arcgisLayersRef.current[layerUrl]);
+          delete arcgisLayersRef.current[layerUrl];
         }
-      } else if (!visible && arcgisLayersRef.current[layerUrl]) {
-        // Remove ArcGIS layer
-        mapInstanceRef.current.removeLayer(arcgisLayersRef.current[layerUrl]);
-        delete arcgisLayersRef.current[layerUrl];
-      }
-    });
+      });
+    };
+
+    loadLayers();
   }, [arcgisLayers, isAuthenticated]);
 
   const handleZoomToFit = () => {
@@ -530,7 +369,7 @@ export default function MapContainer({
   };
 
   // Expose the clear map function globally so it can be called from the sidebar
-  window.mapClearFunction = handleClearMap;
+  (window as any).mapClearFunction = handleClearMap;
 
   return (
     <div className="relative h-full">
