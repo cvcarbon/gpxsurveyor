@@ -36,6 +36,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const result = await parseKML(file.buffer);
           polygon = result.polygon;
           fileData = result.data;
+        } else if (file.mimetype.includes("gpx") || file.originalname.endsWith(".gpx")) {
+          console.log("Parsing GPX file");
+          const result = await parseGPX(file.buffer);
+          polygon = result.polygon;
+          fileData = result.data;
         } else if (file.mimetype.includes("zip") || file.originalname.endsWith(".shp")) {
           console.log("Parsing SHP file");
           const result = await parseSHP(file.buffer);
@@ -50,7 +55,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log("Polygon extracted successfully");
           const uploadedFile = await storage.createUploadedFile({
             fileName: file.originalname,
-            fileType: file.originalname.endsWith(".kml") ? "kml" : "shp",
+            fileType: file.originalname.endsWith(".kml") ? "kml" : (file.originalname.endsWith(".gpx") ? "gpx" : "shp"),
             fileData,
             polygon,
           });
@@ -520,6 +525,87 @@ async function generateTransectRoute(polygon: any, parameters: any) {
 // ============================================================================
 // FILE PARSING UTILITIES
 // ============================================================================
+
+const parseGPX = async (buffer: Buffer): Promise<{ polygon: any; data: any }> => {
+  const parser = new xml2js.Parser();
+  
+  try {
+    const result = await parser.parseStringPromise(buffer.toString());
+    
+    // Extract coordinates from GPX
+    const coordinates = extractGPXCoordinates(result);
+    
+    if (coordinates && coordinates.length >= 3) {
+      // Ensure polygon is closed
+      if (coordinates[0][0] !== coordinates[coordinates.length - 1][0] ||
+          coordinates[0][1] !== coordinates[coordinates.length - 1][1]) {
+        coordinates.push([...coordinates[0]]);
+      }
+      
+      const polygon = turf.polygon([coordinates]);
+      return { polygon: polygon, data: result };
+    }
+    
+    throw new Error("No valid polygon found in GPX");
+  } catch (error) {
+    throw new Error("Failed to parse GPX file");
+  }
+};
+
+const extractGPXCoordinates = (gpxData: any): number[][] | null => {
+  try {
+    console.log("Extracting GPX coordinates");
+    const gpx = gpxData.gpx;
+    if (!gpx) return null;
+
+    let points: any[] = [];
+
+    // Try tracks (<trk>)
+    if (gpx.trk) {
+      for (const trk of gpx.trk) {
+        if (trk.trkseg) {
+          for (const seg of trk.trkseg) {
+            if (seg.trkpt) {
+              points = points.concat(seg.trkpt);
+            }
+          }
+        }
+      }
+    }
+    
+    // If no tracks, try routes (<rte>)
+    if (points.length === 0 && gpx.rte) {
+      for (const rte of gpx.rte) {
+        if (rte.rtept) {
+          points = points.concat(rte.rtept);
+        }
+      }
+    }
+
+    // If no routes, try waypoints (<wpt>) - effectively a convex hull of points
+    if (points.length === 0 && gpx.wpt) {
+      points = gpx.wpt;
+    }
+
+    if (points.length === 0) {
+      console.log("No points found in GPX");
+      return null;
+    }
+
+    console.log(`Found ${points.length} points in GPX`);
+
+    return points.map((pt: any) => {
+      // Attributes are usually in $, e.g. <trkpt lat="..." lon="...">
+      const lat = parseFloat(pt.$.lat);
+      const lon = parseFloat(pt.$.lon);
+      return [lon, lat];
+    });
+
+  } catch (error) {
+    console.error("Error extracting GPX coordinates:", error);
+    return null;
+  }
+};
 
 const parseKML = async (buffer: Buffer): Promise<{ polygon: any; data: any }> => {
   const parser = new xml2js.Parser();

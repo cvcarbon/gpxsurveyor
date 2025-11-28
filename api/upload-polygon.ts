@@ -31,6 +31,43 @@ function parseKMLString(xmlString: string): any {
   return turf.polygon([coordinates]);
 }
 
+// Simple XML parser for GPX
+function parseGPXString(xmlString: string): any {
+  // Regex to match trkpt, rtept, or wpt tags with lat and lon attributes
+  // Handles both lat first and lon first cases
+  const pointRegex = /<(?:trkpt|rtept|wpt)[^>]*lat=["']([^"']+)["'][^>]*lon=["']([^"']+)["'][^>]*>|<(?:trkpt|rtept|wpt)[^>]*lon=["']([^"']+)["'][^>]*lat=["']([^"']+)["'][^>]*>/gi;
+  
+  const coordinates: number[][] = [];
+  let match;
+  
+  while ((match = pointRegex.exec(xmlString)) !== null) {
+    let lat, lon;
+    if (match[1] && match[2]) {
+      lat = parseFloat(match[1]);
+      lon = parseFloat(match[2]);
+    } else if (match[3] && match[4]) {
+      lon = parseFloat(match[3]);
+      lat = parseFloat(match[4]);
+    }
+    
+    if (lat !== undefined && lon !== undefined && !isNaN(lat) && !isNaN(lon)) {
+      coordinates.push([lon, lat]);
+    }
+  }
+  
+  if (coordinates.length < 3) {
+    throw new Error('Not enough coordinates for a polygon in GPX');
+  }
+  
+  // Ensure polygon is closed
+  if (coordinates[0][0] !== coordinates[coordinates.length - 1][0] ||
+      coordinates[0][1] !== coordinates[coordinates.length - 1][1]) {
+    coordinates.push([...coordinates[0]]);
+  }
+  
+  return turf.polygon([coordinates]);
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Enable CORS
   res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -64,8 +101,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         : fileContent;
       
       polygon = parseKMLString(content);
+    } else if (fileType === 'gpx' || fileName?.endsWith('.gpx')) {
+      // Decode base64 if needed
+      const content = fileContent.startsWith('data:') 
+        ? Buffer.from(fileContent.split(',')[1], 'base64').toString('utf-8')
+        : fileContent;
+      
+      polygon = parseGPXString(content);
     } else {
-      return res.status(400).json({ message: 'Unsupported file type. Only KML files are supported.' });
+      return res.status(400).json({ message: 'Unsupported file type. Only KML and GPX files are supported.' });
     }
 
     if (!polygon) {
@@ -75,8 +119,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json({
       files: [{
         id: Date.now(),
-        fileName: fileName || 'uploaded.kml',
-        fileType: 'kml',
+        fileName: fileName || 'uploaded.file',
+        fileType: fileType || (fileName?.endsWith('.gpx') ? 'gpx' : 'kml'),
       }],
       polygons: [polygon],
     });

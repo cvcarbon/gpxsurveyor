@@ -245,9 +245,24 @@ export default function MapContainer({
         }
       }
 
+      // First, remove any layers that are no longer in the arcgisLayers object
+      // This handles switching between admin/public layers
+      const currentLayerUrls = new Set(Object.keys(arcgisLayers));
+      Object.keys(arcgisLayersRef.current).forEach((existingUrl) => {
+        if (!currentLayerUrls.has(existingUrl)) {
+          console.log(`Removing stale ArcGIS layer: ${existingUrl}`);
+          mapInstanceRef.current.removeLayer(arcgisLayersRef.current[existingUrl]);
+          delete arcgisLayersRef.current[existingUrl];
+        }
+      });
+
       Object.entries(arcgisLayers).forEach(([layerUrl, visible]) => {
         if (visible && !arcgisLayersRef.current[layerUrl]) {
           console.log(`Adding ArcGIS layer: ${layerUrl}`);
+          console.log(`Layer URL being loaded: ${layerUrl}`);
+          console.log(`Is LEASE_LAYER_PUBLIC: ${layerUrl === LEASE_LAYER_PUBLIC}`);
+          console.log(`Is LEASE_LAYER_ADMIN: ${layerUrl === LEASE_LAYER_ADMIN}`);
+          console.log(`Token available: ${!!token}`);
           
           // Determine layer type and styling
           const isLeaseLayer = layerUrl.includes("Lease") || layerUrl === LEASE_LAYER_ADMIN || layerUrl === LEASE_LAYER_PUBLIC;
@@ -262,9 +277,12 @@ export default function MapContainer({
               precision: 6,
             };
 
-            // Add token if authenticated
+            // Add token if authenticated - required for both admin and public restricted layers
             if (token) {
               layerOptions.token = token;
+              console.log(`Token added to layer options for ${layerUrl}`);
+            } else {
+              console.warn(`No token available for layer ${layerUrl} - this may cause issues if the layer requires authentication`);
             }
 
             const layer = EsriLeaflet.featureLayer(layerOptions);
@@ -306,16 +324,37 @@ export default function MapContainer({
             
             layer.on('load', () => {
               console.log(`Finished loading features from ${layerUrl}`);
+              // Query to check feature count
+              layer.query().where('1=1').count((error: any, count: number) => {
+                if (error) {
+                  console.error(`Error counting features for ${layerUrl}:`, error);
+                } else {
+                  console.log(`Layer ${layerUrl} has ${count} features`);
+                  if (count === 0) {
+                    console.warn(`Layer ${layerUrl} returned 0 features - this may indicate a permissions issue or empty dataset`);
+                  }
+                }
+              });
             });
             
             layer.on('error', (e: any) => {
               console.error(`Error loading layer ${layerUrl}:`, e);
+              console.error(`Error details:`, JSON.stringify(e, null, 2));
+            });
+
+            // Also listen for request errors
+            layer.on('requeststart', (e: any) => {
+              console.log(`Request started for ${layerUrl}`);
+            });
+            
+            layer.on('requestend', (e: any) => {
+              console.log(`Request ended for ${layerUrl}`);
             });
 
             // Add to map
             layer.addTo(mapInstanceRef.current);
             arcgisLayersRef.current[layerUrl] = layer;
-            console.log(`Successfully added layer ${layerUrl}`);
+            console.log(`Successfully added layer ${layerUrl} to map`);
             
           } catch (error) {
             console.error(`Error adding ArcGIS layer ${layerUrl}:`, error);

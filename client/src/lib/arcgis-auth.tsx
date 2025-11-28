@@ -18,7 +18,7 @@ const ArcGISAuthContext = createContext<ArcGISAuthContextType | undefined>(undef
 
 // Layer URLs
 export const LEASE_LAYER_ADMIN = "https://services.arcgis.com/W1AXaDPef2QMa9kU/arcgis/rest/services/Leases/FeatureServer/0";
-export const LEASE_LAYER_PUBLIC = "https://services.arcgis.com/W1AXaDPef2QMa9kU/arcgis/rest/services/Lease_Boundaries_Leasee_View/FeatureServer/0";
+export const LEASE_LAYER_PUBLIC = "https://services.arcgis.com/W1AXaDPef2QMa9kU/arcgis/rest/services/Leases_Filtered_View/FeatureServer/0";
 export const BEDDING_LAYER_URL = "https://services.arcgis.com/W1AXaDPef2QMa9kU/arcgis/rest/services/Bedding_Documentation_view/FeatureServer/0";
 
 export function ArcGISAuthProvider({ children }: { children: ReactNode }) {
@@ -72,6 +72,27 @@ export function ArcGISAuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Check if user has access to the public/leasee layer
+  const checkPublicLayerAccess = async (token: string): Promise<{ accessible: boolean; count: number }> => {
+    try {
+      const response = await fetch(
+        `${LEASE_LAYER_PUBLIC}/query?where=1=1&returnCountOnly=true&f=json&token=${token}`
+      );
+      const data = await response.json();
+      
+      if (data.count !== undefined && !data.error) {
+        console.log(`Public layer access confirmed - ${data.count} leases available for this user`);
+        return { accessible: true, count: data.count };
+      }
+      
+      console.log("Public layer access denied:", data.error?.message || "Unknown error");
+      return { accessible: false, count: 0 };
+    } catch (error) {
+      console.log("Public layer check failed:", error);
+      return { accessible: false, count: 0 };
+    }
+  };
+
   const checkAuthStatus = async () => {
     try {
       setIsLoading(true);
@@ -87,11 +108,24 @@ export function ArcGISAuthProvider({ children }: { children: ReactNode }) {
         setIsAuthenticated(true);
         setUser(portalInstance.user);
         setPortal(portalInstance);
+        console.log("User authenticated:", portalInstance.user?.username);
         
         // Check admin access with the token
         if (credential.token) {
           const hasAdminAccess = await checkAdminAccess(credential.token);
           setIsAdmin(hasAdminAccess);
+          
+          // If not admin, check public layer access for debugging
+          if (!hasAdminAccess) {
+            console.log("User is not admin, checking public layer access...");
+            const publicAccess = await checkPublicLayerAccess(credential.token);
+            if (!publicAccess.accessible) {
+              console.error("WARNING: User does not have access to the public layer either!");
+              console.error("Public layer URL:", LEASE_LAYER_PUBLIC);
+            } else if (publicAccess.count === 0) {
+              console.warn("Public layer is accessible but returned 0 features for this user");
+            }
+          }
         }
       }
     } catch (error) {
@@ -123,6 +157,7 @@ export function ArcGISAuthProvider({ children }: { children: ReactNode }) {
       
       await portalInstance.load();
       console.log("Portal loaded successfully:", portalInstance);
+      console.log("User authenticated:", portalInstance.user?.username);
       
       setIsAuthenticated(true);
       setUser(portalInstance.user);
@@ -132,6 +167,18 @@ export function ArcGISAuthProvider({ children }: { children: ReactNode }) {
       if (credential.token) {
         const hasAdminAccess = await checkAdminAccess(credential.token);
         setIsAdmin(hasAdminAccess);
+        
+        // If not admin, check public layer access for debugging
+        if (!hasAdminAccess) {
+          console.log("User is not admin, checking public layer access...");
+          const publicAccess = await checkPublicLayerAccess(credential.token);
+          if (!publicAccess.accessible) {
+            console.error("WARNING: User does not have access to the public layer either!");
+            console.error("Public layer URL:", LEASE_LAYER_PUBLIC);
+          } else if (publicAccess.count === 0) {
+            console.warn("Public layer is accessible but returned 0 features for this user");
+          }
+        }
       }
     } catch (error: any) {
       console.error("Sign in failed:", error);

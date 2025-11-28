@@ -18,7 +18,7 @@ export default function RoutePlanner() {
   });
   const [generatedRoute, setGeneratedRoute] = useState<any>(null);
   const [isGenerating, setIsGenerating] = useState(false);
-  const { isAdmin, isAuthenticated } = useArcGISAuth();
+  const { isAdmin, isAuthenticated, isLoading } = useArcGISAuth();
   
   // Always show the lease layer - use admin layer if authenticated with admin access
   const leaseLayerUrl = isAdmin ? LEASE_LAYER_ADMIN : LEASE_LAYER_PUBLIC;
@@ -26,9 +26,18 @@ export default function RoutePlanner() {
   
   // Update layers when auth status changes
   useEffect(() => {
+    // Wait for auth loading to complete before setting layers
+    // This prevents showing the wrong layer during auth check
+    if (isLoading) {
+      console.log("Auth still loading, waiting to set layers...");
+      return;
+    }
+    
     const url = isAdmin ? LEASE_LAYER_ADMIN : LEASE_LAYER_PUBLIC;
+    console.log(`Setting layer based on auth status - isAdmin: ${isAdmin}, isAuthenticated: ${isAuthenticated}`);
+    console.log(`Using layer URL: ${url}`);
     setArcgisLayers({ [url]: true });
-  }, [isAdmin, isAuthenticated]);
+  }, [isAdmin, isAuthenticated, isLoading]);
   
   const { toast } = useToast();
 

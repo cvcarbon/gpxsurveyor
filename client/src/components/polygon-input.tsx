@@ -30,7 +30,7 @@ export default function PolygonInput({
     try {
       const file = files[0]; // Process first file
       
-      // Read file as text for KML files
+      // Read file as text for KML/GPX files
       const fileContent = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(reader.result as string);
@@ -38,10 +38,17 @@ export default function PolygonInput({
         reader.readAsText(file);
       });
 
+      let fileType = 'unknown';
+      if (file.name.endsWith('.kml')) {
+        fileType = 'kml';
+      } else if (file.name.endsWith('.gpx')) {
+        fileType = 'gpx';
+      }
+
       const response = await apiRequest("POST", "/api/upload-polygon", {
         fileContent,
         fileName: file.name,
-        fileType: file.name.endsWith('.kml') ? 'kml' : 'unknown',
+        fileType,
       });
       const result = await response.json();
 
@@ -149,14 +156,14 @@ export default function PolygonInput({
             >
               <CloudUpload className="h-8 w-8 text-gray-400 mb-2 mx-auto" />
               <p className="text-sm font-medium text-gray-700">
-                Drop KML or SHP files here
+                Drop KML, GPX or SHP files here
               </p>
               <p className="text-xs text-gray-500 mt-1">or click to browse</p>
               <Input
                 ref={fileInputRef}
                 type="file"
                 className="hidden"
-                accept=".kml,.shp,.zip"
+                accept=".kml,.gpx,.shp,.zip"
                 multiple
                 onChange={handleFileInputChange}
               />
