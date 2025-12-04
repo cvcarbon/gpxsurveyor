@@ -49,25 +49,27 @@ export function ArcGISAuthProvider({ children }: { children: ReactNode }) {
     checkAuthStatus();
   }, []);
 
-  // Check if user has admin access to the full Leases layer
-  const checkAdminAccess = async (token: string): Promise<boolean> => {
+  // Check if user is in the Admin group
+  const checkAdminGroup = async (portalUser: any): Promise<boolean> => {
     try {
-      // Try to query the admin layer - if it succeeds, user has access
-      const response = await fetch(
-        `${LEASE_LAYER_ADMIN}/query?where=1=1&returnCountOnly=true&f=json&token=${token}`
-      );
-      const data = await response.json();
+      if (!portalUser) return false;
       
-      // If we get a count back (not an error), user has admin access
-      if (data.count !== undefined && !data.error) {
-        console.log(`Admin access confirmed - ${data.count} leases available`);
-        return true;
+      console.log("Fetching user groups...");
+      const groups = await portalUser.fetchGroups();
+      console.log("User groups:", groups.map((g: any) => g.title));
+      
+      // Check for "Admin" group (case insensitive)
+      const isAdminGroup = groups.some((g: any) => g.title.toLowerCase() === "admin");
+      
+      if (isAdminGroup) {
+        console.log("User confirmed as Admin via group membership");
+      } else {
+        console.log("User is NOT in Admin group");
       }
       
-      console.log("Admin layer access denied:", data.error?.message || "Unknown error");
-      return false;
+      return isAdminGroup;
     } catch (error) {
-      console.log("Admin layer check failed:", error);
+      console.error("Error fetching user groups:", error);
       return false;
     }
   };
@@ -110,21 +112,19 @@ export function ArcGISAuthProvider({ children }: { children: ReactNode }) {
         setPortal(portalInstance);
         console.log("User authenticated:", portalInstance.user?.username);
         
-        // Check admin access with the token
-        if (credential.token) {
-          const hasAdminAccess = await checkAdminAccess(credential.token);
-          setIsAdmin(hasAdminAccess);
-          
-          // If not admin, check public layer access for debugging
-          if (!hasAdminAccess) {
-            console.log("User is not admin, checking public layer access...");
-            const publicAccess = await checkPublicLayerAccess(credential.token);
-            if (!publicAccess.accessible) {
-              console.error("WARNING: User does not have access to the public layer either!");
-              console.error("Public layer URL:", LEASE_LAYER_PUBLIC);
-            } else if (publicAccess.count === 0) {
-              console.warn("Public layer is accessible but returned 0 features for this user");
-            }
+        // Check admin group membership
+        const hasAdminAccess = await checkAdminGroup(portalInstance.user);
+        setIsAdmin(hasAdminAccess);
+        
+        // If not admin, check public layer access for debugging
+        if (!hasAdminAccess && credential.token) {
+          console.log("User is not admin, checking public layer access...");
+          const publicAccess = await checkPublicLayerAccess(credential.token);
+          if (!publicAccess.accessible) {
+            console.error("WARNING: User does not have access to the public layer either!");
+            console.error("Public layer URL:", LEASE_LAYER_PUBLIC);
+          } else if (publicAccess.count === 0) {
+            console.warn("Public layer is accessible but returned 0 features for this user");
           }
         }
       }
@@ -163,21 +163,19 @@ export function ArcGISAuthProvider({ children }: { children: ReactNode }) {
       setUser(portalInstance.user);
       setPortal(portalInstance);
       
-      // Check admin access with the token
-      if (credential.token) {
-        const hasAdminAccess = await checkAdminAccess(credential.token);
-        setIsAdmin(hasAdminAccess);
-        
-        // If not admin, check public layer access for debugging
-        if (!hasAdminAccess) {
-          console.log("User is not admin, checking public layer access...");
-          const publicAccess = await checkPublicLayerAccess(credential.token);
-          if (!publicAccess.accessible) {
-            console.error("WARNING: User does not have access to the public layer either!");
-            console.error("Public layer URL:", LEASE_LAYER_PUBLIC);
-          } else if (publicAccess.count === 0) {
-            console.warn("Public layer is accessible but returned 0 features for this user");
-          }
+      // Check admin group membership
+      const hasAdminAccess = await checkAdminGroup(portalInstance.user);
+      setIsAdmin(hasAdminAccess);
+      
+      // If not admin, check public layer access for debugging
+      if (!hasAdminAccess && credential.token) {
+        console.log("User is not admin, checking public layer access...");
+        const publicAccess = await checkPublicLayerAccess(credential.token);
+        if (!publicAccess.accessible) {
+          console.error("WARNING: User does not have access to the public layer either!");
+          console.error("Public layer URL:", LEASE_LAYER_PUBLIC);
+        } else if (publicAccess.count === 0) {
+          console.warn("Public layer is accessible but returned 0 features for this user");
         }
       }
     } catch (error: any) {

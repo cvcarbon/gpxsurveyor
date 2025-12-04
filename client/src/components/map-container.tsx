@@ -14,6 +14,7 @@ interface MapContainerProps {
   onDrawingModeChange?: (mode: boolean) => void;
   onToggleSidebar?: () => void;
   arcgisLayers?: Record<string, boolean>;
+  selectedLease?: any;
 }
 
 export default function MapContainer({
@@ -25,11 +26,13 @@ export default function MapContainer({
   onDrawingModeChange,
   onToggleSidebar,
   arcgisLayers = {},
+  selectedLease,
 }: MapContainerProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
   const polygonLayerRef = useRef<any>(null);
   const routeLayerRef = useRef<any>(null);
+  const selectedLeaseLayerRef = useRef<any>(null);
   const drawControlRef = useRef<any>(null);
   const drawnItemsRef = useRef<any>(null);
   const arcgisLayersRef = useRef<Record<string, any>>({});
@@ -222,6 +225,49 @@ export default function MapContainer({
     }
   }, [generatedRoute]);
 
+  // Handle selected lease highlight
+  useEffect(() => {
+    if (mapInstanceRef.current && selectedLease) {
+      import("leaflet").then((L) => {
+        // Remove existing layer
+        if (selectedLeaseLayerRef.current) {
+          mapInstanceRef.current.removeLayer(selectedLeaseLayerRef.current);
+        }
+
+        // Create new layer
+        const layer = L.geoJSON(selectedLease.geometry, {
+          style: {
+            color: '#ef4444', // Red for highlight
+            weight: 4,
+            opacity: 1,
+            fill: false,
+            dashArray: '10, 10'
+          }
+        });
+
+        // Add popup
+        const props = selectedLease.attributes;
+        if (props) {
+            const popupContent = Object.entries(props)
+                .filter(([key, value]) => value !== null && value !== undefined && key !== 'OBJECTID' && key !== 'Shape__Area' && key !== 'Shape__Length')
+                .map(([key, value]) => `<strong>${key}:</strong> ${value}`)
+                .join('<br>');
+             layer.bindPopup(`<strong>Selected Lease</strong><br>${popupContent}`);
+        }
+
+        selectedLeaseLayerRef.current = layer;
+        layer.addTo(mapInstanceRef.current);
+        
+        // Fit bounds
+        const bounds = layer.getBounds();
+        if (bounds.isValid()) {
+          mapInstanceRef.current.fitBounds(bounds, { padding: [50, 50] });
+          layer.openPopup();
+        }
+      });
+    }
+  }, [selectedLease]);
+
   // Handle ArcGIS layers using esri-leaflet
   useEffect(() => {
     if (!mapInstanceRef.current) return;
@@ -396,6 +442,12 @@ export default function MapContainer({
       if (routeLayerRef.current) {
         mapInstanceRef.current.removeLayer(routeLayerRef.current);
         routeLayerRef.current = null;
+      }
+
+      // Clear selected lease layer
+      if (selectedLeaseLayerRef.current) {
+        mapInstanceRef.current.removeLayer(selectedLeaseLayerRef.current);
+        selectedLeaseLayerRef.current = null;
       }
       
       // Clear drawn items

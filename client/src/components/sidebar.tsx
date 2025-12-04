@@ -7,6 +7,7 @@ import RouteParameters from "./route-parameters";
 import RouteGeneration from "./route-generation";
 import ExportOptions from "./export-options";
 import ArcGISSignIn from "./arcgis-signin";
+import LeaseSearch from "./lease-search";
 
 import { RouteParameters as RouteParametersType } from "@shared/schema";
 import { cn } from "@/lib/utils";
@@ -22,6 +23,7 @@ interface SidebarProps {
   isGenerating: boolean;
   onRouteGenerated: (route: any) => void;
   onError: (error: string) => void;
+  onLeaseSelect: (geometry: any, attributes: any) => void;
 }
 
 export default function Sidebar({
@@ -35,6 +37,7 @@ export default function Sidebar({
   isGenerating,
   onRouteGenerated,
   onError,
+  onLeaseSelect,
 }: SidebarProps) {
   return (
     <div className={cn(
@@ -72,6 +75,8 @@ export default function Sidebar({
 
       {/* Scrollable Content */}
       <div className="flex-1 overflow-y-auto">
+        <LeaseSearch onLeaseFound={onLeaseSelect} />
+
         <PolygonInput
           polygon={polygon}
           onPolygonChange={onPolygonChange}

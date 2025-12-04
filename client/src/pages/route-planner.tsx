@@ -18,6 +18,7 @@ export default function RoutePlanner() {
   });
   const [generatedRoute, setGeneratedRoute] = useState<any>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [selectedLease, setSelectedLease] = useState<any>(null);
   const { isAdmin, isAuthenticated, isLoading } = useArcGISAuth();
   
   // Always show the lease layer - use admin layer if authenticated with admin access
@@ -85,6 +86,14 @@ export default function RoutePlanner() {
     });
   };
 
+  const handleLeaseSelect = (geometry: any, attributes: any) => {
+    setSelectedLease({ geometry, attributes });
+    toast({
+      title: "Lease Found",
+      description: `Navigating to lease...`,
+    });
+  };
+
   return (
     <>
       <Helmet>
@@ -118,6 +127,7 @@ export default function RoutePlanner() {
           isGenerating={isGenerating}
           onRouteGenerated={handleRouteGenerated}
           onError={handleError}
+          onLeaseSelect={handleLeaseSelect}
         />
         
         <div className="flex-1 relative">
@@ -131,6 +141,7 @@ export default function RoutePlanner() {
               setUserToggled(true);
             }}
             arcgisLayers={arcgisLayers}
+            selectedLease={selectedLease}
           />
         </div>
       </div>
