@@ -338,7 +338,8 @@ export default function MapContainer({
               color: '#fbbf24', // Yellow color
               weight: 2,
               opacity: 1,
-              fillOpacity: 0 // No fill
+              fillColor: '#fbbf24',
+              fillOpacity: 0.1 // Slight fill to make it easier to see
             } : {
               color: '#3b82f6', // Blue color
               weight: 1,
@@ -424,8 +425,26 @@ export default function MapContainer({
         mapInstanceRef.current.fitBounds(polygonLayerRef.current.getBounds(), { padding: [20, 20] });
       } else if (routeLayerRef.current) {
         mapInstanceRef.current.fitBounds(routeLayerRef.current.getBounds(), { padding: [20, 20] });
+      } else if (selectedLeaseLayerRef.current) {
+        mapInstanceRef.current.fitBounds(selectedLeaseLayerRef.current.getBounds(), { padding: [20, 20] });
       } else {
-        mapInstanceRef.current.setView([40.7128, -74.0060], 10);
+        // Try to fit to ArcGIS layers
+        let bounds: any = null;
+        Object.values(arcgisLayersRef.current).forEach((layer: any) => {
+          if (layer.getBounds) {
+            if (!bounds) {
+              bounds = layer.getBounds();
+            } else {
+              bounds.extend(layer.getBounds());
+            }
+          }
+        });
+        
+        if (bounds && bounds.isValid()) {
+          mapInstanceRef.current.fitBounds(bounds, { padding: [20, 20] });
+        } else {
+          mapInstanceRef.current.setView([29.3013, -94.7977], 12); // Default to Galveston Bay
+        }
       }
     }
   };

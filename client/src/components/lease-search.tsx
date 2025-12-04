@@ -32,9 +32,9 @@ export default function LeaseSearch({ onLeaseFound }: LeaseSearchProps) {
       const credential = await IdentityManager.getCredential(layerUrl);
       const token = credential.token;
 
-      // Try searching by Lease_Number (string match)
-      // Note: Adjust 'Lease_Number' if the actual field name is different (e.g. 'Lease_ID', 'Lease')
-      const whereClause = `Lease_Number = '${searchTerm}'`;
+      // Try searching by lease_number (lowercase as confirmed)
+      // Note: ArcGIS queries can be case-insensitive depending on backend
+      const whereClause = `lease_number = '${searchTerm}'`;
       
       const queryUrl = `${layerUrl}/query?where=${encodeURIComponent(whereClause)}&outFields=*&returnGeometry=true&f=geojson&token=${token}`;
       
@@ -47,11 +47,25 @@ export default function LeaseSearch({ onLeaseFound }: LeaseSearchProps) {
         console.error("Search error:", data.error);
         
         // If it was a 400 error, it might be because the field is numeric and we used quotes
-        // Or the field name is wrong.
-        // Let's try numeric search if the input looks numeric
+        // Or the field name might be CamelCase (Lease_Number) if lowercase failed
+        
+        // Try Lease_Number (CamelCase)
+        console.log("Retrying with CamelCase Lease_Number...");
+        const whereClauseCamel = `Lease_Number = '${searchTerm}'`;
+        const queryUrlCamel = `${layerUrl}/query?where=${encodeURIComponent(whereClauseCamel)}&outFields=*&returnGeometry=true&f=geojson&token=${token}`;
+        const responseCamel = await fetch(queryUrlCamel);
+        const dataCamel = await responseCamel.json();
+        
+        if (!dataCamel.error && dataCamel.features && dataCamel.features.length > 0) {
+             const feature = dataCamel.features[0];
+             onLeaseFound(feature.geometry, feature.properties);
+             return;
+        }
+
+        // Try numeric search if input looks numeric
         if (!isNaN(Number(searchTerm))) {
              console.log("Retrying with numeric query...");
-             const whereClauseNum = `Lease_Number = ${searchTerm}`;
+             const whereClauseNum = `lease_number = ${searchTerm}`;
              const queryUrlNum = `${layerUrl}/query?where=${encodeURIComponent(whereClauseNum)}&outFields=*&returnGeometry=true&f=geojson&token=${token}`;
              const responseNum = await fetch(queryUrlNum);
              const dataNum = await responseNum.json();
