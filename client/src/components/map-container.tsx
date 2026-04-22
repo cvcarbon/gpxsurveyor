@@ -5,6 +5,39 @@ import { Expand, Trash2, Layers, ZoomIn, ZoomOut, Menu } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useArcGISAuth, LEASE_LAYER_ADMIN, LEASE_LAYER_PUBLIC } from "@/lib/arcgis-auth";
 
+const ADMIN_AREAS_ENDPOINT = "/api/admin-areas";
+
+const webMercatorToWgs84 = (x: number, y: number): [number, number] => {
+  const lng = (x / 20037508.34) * 180;
+  const lat = (Math.atan(Math.exp((y / 20037508.34) * Math.PI)) * 360) / Math.PI - 90;
+  return [lng, lat];
+};
+
+const reprojectCoordinates = (coordinates: any): any => {
+  if (!Array.isArray(coordinates)) {
+    return coordinates;
+  }
+
+  if (typeof coordinates[0] === "number" && typeof coordinates[1] === "number") {
+    return webMercatorToWgs84(coordinates[0], coordinates[1]);
+  }
+
+  return coordinates.map((coordinate: any) => reprojectCoordinates(coordinate));
+};
+
+const reprojectFeatureCollection = (featureCollection: any) => ({
+  ...featureCollection,
+  features: (featureCollection.features || []).map((feature: any) => ({
+    ...feature,
+    geometry: feature.geometry
+      ? {
+          ...feature.geometry,
+          coordinates: reprojectCoordinates(feature.geometry.coordinates),
+        }
+      : feature.geometry,
+  })),
+});
+
 interface MapContainerProps {
   polygon: any;
   onPolygonChange: (polygon: any) => void;
@@ -33,12 +66,14 @@ export default function MapContainer({
   const polygonLayerRef = useRef<any>(null);
   const routeLayerRef = useRef<any>(null);
   const selectedLeaseLayerRef = useRef<any>(null);
+  const adminAreasLayerRef = useRef<any>(null);
   const drawControlRef = useRef<any>(null);
   const drawnItemsRef = useRef<any>(null);
   const arcgisLayersRef = useRef<Record<string, any>>({});
   const [mouseCoords, setMouseCoords] = useState({ lat: 29.3013, lng: -94.7977 });
   const [showLegend, setShowLegend] = useState(false);
-  const { isAuthenticated } = useArcGISAuth();
+  const [isMapReady, setIsMapReady] = useState(false);
+  const { isAuthenticated, isAdmin } = useArcGISAuth();
 
   useEffect(() => {
     if (typeof window !== "undefined" && mapRef.current && !mapInstanceRef.current) {
@@ -133,6 +168,7 @@ export default function MapContainer({
         });
 
         mapInstanceRef.current = map;
+        setIsMapReady(true);
       });
     }
 
@@ -141,6 +177,7 @@ export default function MapContainer({
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
       }
+      setIsMapReady(false);
     };
   }, []);
 
@@ -267,6 +304,91 @@ export default function MapContainer({
       });
     }
   }, [selectedLease]);
+
+  // Show local admin areas for AGOL admins only.
+  useEffect(() => {
+    if (!mapInstanceRef.current || !isMapReady) return;
+
+    const clearAdminAreasLayer = () => {
+      if (adminAreasLayerRef.current && mapInstanceRef.current) {
+        mapInstanceRef.current.removeLayer(adminAreasLayerRef.current);
+        adminAreasLayerRef.current = null;
+      }
+    };
+
+    if (!isAdmin) {
+      clearAdminAreasLayer();
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadAdminAreas = async () => {
+      try {
+        const [L, response] = await Promise.all([
+          import("leaflet"),
+          fetch(ADMIN_AREAS_ENDPOINT),
+        ]);
+
+        if (!response.ok) {
+          throw new Error(`Failed to load admin areas: ${response.status}`);
+        }
+
+        const sourceGeoJson = await response.json();
+        const adminAreasGeoJson = reprojectFeatureCollection(sourceGeoJson);
+
+        if (cancelled || !mapInstanceRef.current) {
+          return;
+        }
+
+        clearAdminAreasLayer();
+
+        const layer = L.geoJSON(adminAreasGeoJson, {
+          style: {
+            color: "#16a34a",
+            weight: 2,
+            opacity: 0.9,
+            fillColor: "#22c55e",
+            fillOpacity: 0.12,
+          },
+          onEachFeature: (feature: any, featureLayer: any) => {
+            const props = feature.properties;
+            if (!props) return;
+
+            const popupContent = Object.entries(props)
+              .filter(
+                ([key, value]) =>
+                  value !== null &&
+                  value !== undefined &&
+                  key !== "OBJECTID" &&
+                  key !== "SHAPE_Area" &&
+                  key !== "SHAPE_Length"
+              )
+              .map(([key, value]) => `<strong>${key}:</strong> ${value}`)
+              .join("<br>");
+
+            featureLayer.bindPopup(`<strong>Admin Area</strong><br>${popupContent}`);
+          },
+        });
+
+        adminAreasLayerRef.current = layer;
+        layer.addTo(mapInstanceRef.current);
+        layer.bringToFront?.();
+        console.log(
+          `Loaded ${(adminAreasGeoJson.features || []).length} admin area features for admin user`
+        );
+      } catch (error) {
+        console.error("Error loading admin areas:", error);
+      }
+    };
+
+    loadAdminAreas();
+
+    return () => {
+      cancelled = true;
+      clearAdminAreasLayer();
+    };
+  }, [isAdmin, isMapReady]);
 
   // Handle ArcGIS layers using esri-leaflet
   useEffect(() => {
@@ -427,6 +549,8 @@ export default function MapContainer({
         mapInstanceRef.current.fitBounds(routeLayerRef.current.getBounds(), { padding: [20, 20] });
       } else if (selectedLeaseLayerRef.current) {
         mapInstanceRef.current.fitBounds(selectedLeaseLayerRef.current.getBounds(), { padding: [20, 20] });
+      } else if (adminAreasLayerRef.current) {
+        mapInstanceRef.current.fitBounds(adminAreasLayerRef.current.getBounds(), { padding: [20, 20] });
       } else {
         // Try to fit to ArcGIS layers
         let bounds: any = null;

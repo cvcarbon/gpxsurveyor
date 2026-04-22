@@ -1,6 +1,8 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
+import fs from "fs";
 import multer from "multer";
+import path from "path";
 import { storage } from "./storage";
 import { routeParametersSchema } from "@shared/schema";
 import * as turf from "@turf/turf";
@@ -9,6 +11,17 @@ import * as xml2js from "xml2js";
 const upload = multer({ storage: multer.memoryStorage() });
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  app.get("/api/admin-areas", async (_req: Request, res: Response) => {
+    try {
+      const geoJsonPath = path.resolve(import.meta.dirname, "..", "col_aareas.geojson");
+      const fileContents = await fs.promises.readFile(geoJsonPath, "utf-8");
+      res.type("application/geo+json").send(fileContents);
+    } catch (error) {
+      console.error("Failed to load admin areas GeoJSON:", error);
+      res.status(500).json({ message: "Failed to load admin areas" });
+    }
+  });
+  
   
   // Upload polygon files (KML/SHP)
   app.post("/api/upload-polygon", upload.array("files"), async (req: any, res: Response) => {
