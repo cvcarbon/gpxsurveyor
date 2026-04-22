@@ -5,6 +5,7 @@ import { Expand, Trash2, Layers, ZoomIn, ZoomOut, Menu } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useArcGISAuth, LEASE_LAYER_ADMIN, LEASE_LAYER_PUBLIC } from "@/lib/arcgis-auth";
 
+const ADMIN_AREAS_PUBLIC_PATH = "/col_aareas.geojson";
 const ADMIN_AREAS_ENDPOINT = "/api/admin-areas";
 
 const webMercatorToWgs84 = (x: number, y: number): [number, number] => {
@@ -37,6 +38,34 @@ const reprojectFeatureCollection = (featureCollection: any) => ({
       : feature.geometry,
   })),
 });
+
+const fetchAdminAreasGeoJson = async () => {
+  const sources = [ADMIN_AREAS_PUBLIC_PATH, ADMIN_AREAS_ENDPOINT];
+
+  for (const source of sources) {
+    try {
+      const response = await fetch(source);
+
+      if (!response.ok) {
+        continue;
+      }
+
+      const payload = await response.text();
+      const trimmedPayload = payload.trim();
+
+      if (trimmedPayload.startsWith("<!DOCTYPE") || trimmedPayload.startsWith("<html")) {
+        console.warn(`Admin areas source returned HTML instead of GeoJSON: ${source}`);
+        continue;
+      }
+
+      return JSON.parse(payload);
+    } catch (error) {
+      console.warn(`Failed to load admin areas from ${source}:`, error);
+    }
+  }
+
+  throw new Error("No valid admin areas GeoJSON source was available");
+};
 
 interface MapContainerProps {
   polygon: any;
@@ -325,16 +354,10 @@ export default function MapContainer({
 
     const loadAdminAreas = async () => {
       try {
-        const [L, response] = await Promise.all([
+        const [L, sourceGeoJson] = await Promise.all([
           import("leaflet"),
-          fetch(ADMIN_AREAS_ENDPOINT),
+          fetchAdminAreasGeoJson(),
         ]);
-
-        if (!response.ok) {
-          throw new Error(`Failed to load admin areas: ${response.status}`);
-        }
-
-        const sourceGeoJson = await response.json();
         const adminAreasGeoJson = reprojectFeatureCollection(sourceGeoJson);
 
         if (cancelled || !mapInstanceRef.current) {
