@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Expand, Trash2, Layers, ZoomIn, ZoomOut, Menu } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useArcGISAuth, LEASE_LAYER_ADMIN, LEASE_LAYER_PUBLIC } from "@/lib/arcgis-auth";
+import * as turf from "@turf/turf";
 
 const ADMIN_AREAS_PUBLIC_PATH = "/col_aareas.geojson";
 const ADMIN_AREAS_ENDPOINT = "/api/admin-areas";
@@ -366,7 +367,7 @@ export default function MapContainer({
 
         clearAdminAreasLayer();
 
-        const layer = L.geoJSON(adminAreasGeoJson, {
+        const areaLayer = L.geoJSON(adminAreasGeoJson, {
           style: {
             color: "#16a34a",
             weight: 2,
@@ -394,9 +395,37 @@ export default function MapContainer({
           },
         });
 
-        adminAreasLayerRef.current = layer;
-        layer.addTo(mapInstanceRef.current);
-        layer.bringToFront?.();
+        const bufferFeatures = (adminAreasGeoJson.features || [])
+          .map((feature: any) => {
+            try {
+              return turf.buffer(feature, 200, { units: "feet" });
+            } catch (bufferError) {
+              console.warn("Unable to create 200 ft admin area buffer for feature:", bufferError);
+              return null;
+            }
+          })
+          .filter(Boolean);
+
+        const bufferLayer =
+          bufferFeatures.length > 0
+            ? L.geoJSON(turf.featureCollection(bufferFeatures as any), {
+                style: {
+                  color: "#15803d",
+                  weight: 2,
+                  opacity: 0.95,
+                  dashArray: "10, 8",
+                  fill: false,
+                },
+              })
+            : null;
+
+        const layers = bufferLayer ? [areaLayer, bufferLayer] : [areaLayer];
+        const combinedLayer = L.featureGroup(layers as any);
+
+        adminAreasLayerRef.current = combinedLayer;
+        combinedLayer.addTo(mapInstanceRef.current);
+        areaLayer.bringToFront?.();
+        bufferLayer?.bringToFront?.();
         console.log(
           `Loaded ${(adminAreasGeoJson.features || []).length} admin area features for admin user`
         );
