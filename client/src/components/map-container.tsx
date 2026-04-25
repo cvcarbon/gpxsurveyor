@@ -395,10 +395,12 @@ export default function MapContainer({
           },
         });
 
+        const bufferDistanceMeters = 60.96; // 200 ft
         const bufferFeatures = (adminAreasGeoJson.features || [])
           .map((feature: any) => {
             try {
-              return turf.buffer(feature, 200, { units: "feet" });
+              const cleanedFeature = turf.cleanCoords(feature as any);
+              return turf.buffer(cleanedFeature, bufferDistanceMeters, { units: "meters", steps: 32 });
             } catch (bufferError) {
               console.warn("Unable to create 200 ft admin area buffer for feature:", bufferError);
               return null;
@@ -410,10 +412,10 @@ export default function MapContainer({
           bufferFeatures.length > 0
             ? L.geoJSON(turf.featureCollection(bufferFeatures as any), {
                 style: {
-                  color: "#15803d",
-                  weight: 2,
-                  opacity: 0.95,
-                  dashArray: "10, 8",
+                  color: "#dc2626",
+                  weight: 3,
+                  opacity: 1,
+                  dashArray: "12, 8",
                   fill: false,
                 },
               })
@@ -426,6 +428,7 @@ export default function MapContainer({
         combinedLayer.addTo(mapInstanceRef.current);
         areaLayer.bringToFront?.();
         bufferLayer?.bringToFront?.();
+        console.log(`Admin area 200ft buffers rendered: ${bufferFeatures.length}`);
         console.log(
           `Loaded ${(adminAreasGeoJson.features || []).length} admin area features for admin user`
         );
